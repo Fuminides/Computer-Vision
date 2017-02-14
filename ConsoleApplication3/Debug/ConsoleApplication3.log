@@ -1,0 +1,2 @@
+﻿  ConsoleApplication3.cpp
+opencv_world320.lib(opencv_world320.dll) : fatal error LNK1112: tipo de equipo del módulo 'x64' en conflicto con tipo de equipo de destino 'X86'
