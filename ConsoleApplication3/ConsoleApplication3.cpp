@@ -7,109 +7,220 @@
 #define PROFUNDIDAD 5
 using namespace cv;
 
-const bool ECUALIZAR_GREY =  false, ECUALIZAR_COLOR = false, ALIEN = false, POSTER = false, GHOSTING = true;
+Mat distorsionar(Mat , float);
+void alien(Mat);
+void poster(Mat, int);
+void imageGhosting(Mat, double);
+void equalizarGris(Mat);
+void equalizarColor(Mat);
+double ** gauss(int, int);
+Mat aplicar_filtro(Mat, double ** , int , int );
 
-//Para el alien
-double proporciones_piel[] = { 255.0/219.0, 255.0/172.0, 219.0/172.0 }; //R/G, R/B, G/B
-double tolerancias[] = { 0.3, 0.7, 0.2};
+const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = true, ALIEN = false, POSTER = false, GHOSTING = false,
+GAUSSIANO = false, DISTORSION = true;
 
-//Para el poster
-int numero_colores = 230;
-
-//Para ghosting
+Mat frameOriginal;
+Mat frameAnterior[PROFUNDIDAD];
 bool guarda = false;
-double alfa = 0.1;
 int frames_acumulados = 0;
+double alfa = 0.9;
+int numero_colores = 230;
+double k1 = -0.0000005;
 
 int main(int argc, char** argv)
 {
 	VideoCapture cap;
-	// open the default camera, use something different from 0 otherwise;
-	// Check VideoCapture documentation.
+	double ** filtro;
+	int dim_filtro = 3, omega = 2;
+	// La 0 es la camara normal. 1 es la frontal
+	// La camara frontal (Webcam) Esta rota en la Surface.
 
 	if (!cap.open(0))
 		return 0;
-	bool recorrer_matriz = false;
-
-	if (ALIEN | POSTER) {
-		recorrer_matriz = true;
+	if (GAUSSIANO) {
+		filtro = gauss(omega, dim_filtro);
 	}
-
-	Mat frameAnterior[PROFUNDIDAD];
-
 	while (true)
 	{
 		Mat frame, frameOriginal;
-		std::vector<Mat> channels;
 
 		cap >> frame;
 		frameOriginal = frame.clone();
 		
-
-		if (recorrer_matriz) {
-			for (int i = 0; i < frame.rows; i++) {
-				for (int z = 0; z < frame.cols; z++) {
-					Vec3b canales = frame.at<Vec3b>(i, z);
-					unsigned char G = canales[1], R = canales[2], B = canales[0];
-
-					if (ALIEN) {
-						double proporcionRG = R*1.0 / (G*1.0), proporcionRB = R*1.0 / (B*1.0),
-							proporcionGB = G*1.0 / (B*1.0);
-						//std::cout << "Valores: " << std::to_string(proporcionRG) << " " << std::to_string(abs(proporcionRG - proporciones_piel[1])) << std::endl;
-						if ((abs(proporcionRG - proporciones_piel[0]) < tolerancias[0]) &&
-							(abs(proporcionRB - proporciones_piel[1]) < tolerancias[1]) &&
-							(abs(proporcionGB - proporciones_piel[2]) < tolerancias[2]) &&
-							(abs(R - B) > 10) ) {
-							//std::cout << "Entro" << std::endl;
-							canales[0] = 0;
-							canales[1] = 0;
-							canales[2] = 255;
-						}
-						frame.at<Vec3b>(i, z) = canales;
-					}
-
-					if (POSTER) {
-						canales[0] = B % numero_colores *1.0 / numero_colores * 255;
-						canales[1] = G % numero_colores *1.0 / numero_colores * 255;
-						canales[2] = R % numero_colores *1.0 / numero_colores * 255;
-						frame.at<Vec3b>(i, z) = canales;
-					}
-
-				}
-			}
+		if (DISTORSION) {
+			frame = distorsionar(frame, k1);
 		}
-
+		if (ALIEN) {
+			alien(frame);
+		}
+		if (POSTER) {
+			poster(frame, numero_colores);
+		}
 		if (GHOSTING) {
-			if (guarda) {
-				frameAnterior[PROFUNDIDAD - 1] = frameAnterior[PROFUNDIDAD - 1] * (alfa / PROFUNDIDAD);
-				for (int i = 0; i < PROFUNDIDAD-1; i++) {
-					frameAnterior[PROFUNDIDAD-1] = 
-				}
-				frame = frame*(1 - alfa) + frameAnterior*alfa;
-			}
-			else guarda = true;
-			frameAnterior = frame.clone();
+			imageGhosting(frame, alfa);
 		}
-
 		if (ECUALIZAR_GREY) {
-			cvtColor(frame, frame, CV_BGR2GRAY);
-			frameOriginal = frame.clone();
-			equalizeHist(frame, frame);
+			equalizarGris(frame);
 		}
-		else if (ECUALIZAR_COLOR) {
-			cvtColor(frame, frame, CV_BGR2YCrCb);
-			split(frame, channels);
-			equalizeHist(channels[0], channels[0]);
-			merge(channels, frame);
-			cvtColor(frame, frame, CV_YCrCb2BGR);
+		if (ECUALIZAR_COLOR) {
+			equalizarColor(frame);
+		}
+		if (GAUSSIANO) {
+			frame = aplicar_filtro(frame, filtro, dim_filtro, dim_filtro);
 		}
 		
-		if (frame.empty()) break; // end of video stream
+		if (frame.empty()) break; //Si algo falla, escapamos el bucle
 		imshow("Modificada", frame);
 		imshow("Original", frameOriginal);
-		if (waitKey(10) == 27) break; // stop capturing by pressing ESC 
+		if (waitKey(10) == 27) break; //Para con la tecla escape
 	}
-	// the camera will be closed automatically upon exit
-	// cap.close();
+
 	return 0;
+}
+
+/**
+ * Aplica una distorsion a la imagen dada.
+ * Si k > 0 -> Cojin, Si k < 0 -> Barril
+ */
+Mat distorsionar(Mat imagenOrigen, float k1) {
+	Mat mapeoX, mapeoY, output;
+	double ptoPrincipalX = imagenOrigen.rows,
+		ptoPrincipalY = imagenOrigen.cols;
+
+	mapeoX.create(imagenOrigen.size(), CV_32FC1);
+	mapeoY.create(imagenOrigen.size(), CV_32FC1);
+	int rows = imagenOrigen.rows, cols = imagenOrigen.cols;
+
+	for (int i = 0; i < rows; i++) {
+		for (int z = 0; z < cols; z++) {
+			double r_cuadrado = pow(i - ptoPrincipalX, 2) + pow(z - ptoPrincipalY,2);
+		
+			mapeoX.at<float>(i, z) = (z - ptoPrincipalY) * (1+ k1 * r_cuadrado) + ptoPrincipalY;
+			mapeoY.at<float>(i, z) = (i - ptoPrincipalX) * (1 + k1 * r_cuadrado) + ptoPrincipalX;
+		}
+	}
+
+	remap(imagenOrigen, output, mapeoX, mapeoY, CV_INTER_LINEAR);
+
+	return output;
+}
+
+/**
+ * Equaliza la imagen en un canal de grises. (Pone tambien la imagen original en un solo canal).
+ */
+void equalizarGris(Mat frame) {
+	cvtColor(frame, frame, CV_BGR2GRAY);
+	frameOriginal = frame.clone();
+	equalizeHist(frame, frame);
+}
+
+/**
+* Equaliza la imagen en un canal de colores.
+*/
+void equalizarColor(Mat frame) {
+	std::vector<Mat> channels;
+
+	cvtColor(frame, frame, CV_BGR2YCrCb);
+	split(frame, channels);
+	equalizeHist(channels[0], channels[0]);
+	merge(channels, frame);
+	cvtColor(frame, frame, CV_YCrCb2BGR);
+}
+
+/**
+ * Aplica un efecto de ghosting a la imagen.
+ */
+void imageGhosting(Mat frame, double alfa) {
+	if (guarda) {
+		frameAnterior[PROFUNDIDAD - 1] = frameAnterior[PROFUNDIDAD - 1] / double(PROFUNDIDAD);
+		for (int i = 0; i < PROFUNDIDAD - 1; i++) {
+			frameAnterior[PROFUNDIDAD - 1] += frameAnterior[i] / double(PROFUNDIDAD);
+		}
+		frame = frame*(1 - alfa) + frameAnterior[PROFUNDIDAD - 1] * alfa;
+	}
+	else {
+		frames_acumulados++;
+		if (frames_acumulados == PROFUNDIDAD) {
+			guarda = true;
+		}
+	}
+
+	for (int i = 0; i < PROFUNDIDAD - 1; i++) {
+		frameAnterior[i + 1] = frameAnterior[i];
+	}
+	frameAnterior[0] = frame.clone();
+}
+
+/**
+ * Aplica el efecto "alien" a la imagen
+ */
+void alien(Mat frame) {
+	double proporciones_piel[] = { 255.0 / 219.0, 255.0 / 172.0, 219.0 / 172.0 }; //R/G, R/B, G/B
+	double tolerancias[] = { 0.3, 0.7, 0.2 };
+
+	for (int i = 0; i < frame.rows; i++) {
+		for (int z = 0; z < frame.cols; z++) {
+			Vec3b canales = frame.at<Vec3b>(i, z);
+			unsigned char G = canales[1], R = canales[2], B = canales[0];
+
+			double proporcionRG = R*1.0 / (G*1.0), proporcionRB = R*1.0 / (B*1.0),
+				proporcionGB = G*1.0 / (B*1.0);
+			//std::cout << "Valores: " << std::to_string(proporcionRG) << " " << std::to_string(abs(proporcionRG - proporciones_piel[1])) << std::endl;
+			if ((abs(proporcionRG - proporciones_piel[0]) < tolerancias[0]) &&
+				(abs(proporcionRB - proporciones_piel[1]) < tolerancias[1]) &&
+				(abs(proporcionGB - proporciones_piel[2]) < tolerancias[2]) &&
+				(abs(R - B) > 10)) {
+				//std::cout << "Entro" << std::endl;
+				canales[0] = 0;
+				canales[1] = 0;
+				canales[2] = 255;
+			}
+			frame.at<Vec3b>(i, z) = canales;
+		}
+	}
+}
+
+/**
+ * Reduce el numero de colores en la imagen al numero especificado.
+ */
+void poster(Mat frame, int numero_colores) {
+	for (int i = 0; i < frame.rows; i++) {
+		for (int z = 0; z < frame.cols; z++) {
+			Vec3b canales = frame.at<Vec3b>(i, z);
+			unsigned char G = canales[1], R = canales[2], B = canales[0];
+
+			canales[0] = B % numero_colores *1.0 / numero_colores * 255;
+			canales[1] = G % numero_colores *1.0 / numero_colores * 255;
+			canales[2] = R % numero_colores *1.0 / numero_colores * 255;
+			frame.at<Vec3b>(i, z) = canales;
+		}
+	}
+}
+
+/**
+ * Aplica un filtro a una imagen.
+ */
+Mat aplicar_filtro(Mat frame, double ** filtro, int len_x, int len_y) {
+	int rows = frame.rows, cols = frame.cols;
+	Mat resultado = frame.clone();
+
+	for (int i = 0; i < rows; i++) {
+		for (int z = 0; z < cols; z++) {
+			Vec3b color(0, 0, 0); //Mejorable. Como coger el tipo de la matriz?
+
+			for (int x = 0; x < len_x; x++) {
+				for (int y = 0; y < len_y; y++) {
+					int indiceI = i + x - len_x / 2,
+						indiceZ = z + y - len_y / 2;
+					if ((indiceI > 0) && (indiceI < rows) && (indiceZ > 0) && (indiceZ < cols)) {
+						color = color + filtro[x][y]*frame.at<indiceI,indiceZ>;
+					}
+				}
+			}
+			resultado.at<i, z> = color;
+		}
+	}
+
+	return resultado;
+
 }
