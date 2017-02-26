@@ -5,6 +5,7 @@
 #include "opencv2/opencv.hpp"
 
 #define PROFUNDIDAD 5
+#define n 5
 using namespace cv;
 
 Mat distorsionar(Mat , float);
@@ -13,11 +14,11 @@ void poster(Mat, int);
 void imageGhosting(Mat, double);
 void equalizarGris(Mat);
 void equalizarColor(Mat);
-double ** gauss(int, int);
-Mat aplicar_filtro(Mat, double ** , int , int );
+double ** gauss(int);
+Mat aplicar_filtro(Mat, double ** );
 
 const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = true, ALIEN = false, POSTER = false, GHOSTING = false,
-GAUSSIANO = false, DISTORSION = true;
+GAUSSIANO = true, DISTORSION = false;
 
 Mat frameOriginal;
 Mat frameAnterior[PROFUNDIDAD];
@@ -31,14 +32,14 @@ int main(int argc, char** argv)
 {
 	VideoCapture cap;
 	double ** filtro;
-	int dim_filtro = 3, omega = 2;
+	int dim_filtro = 3, omega = 5;
 	// La 0 es la camara normal. 1 es la frontal
 	// La camara frontal (Webcam) Esta rota en la Surface.
 
 	if (!cap.open(0))
 		return 0;
 	if (GAUSSIANO) {
-		filtro = gauss(omega, dim_filtro);
+		filtro = gauss(omega);
 	}
 	while (true)
 	{
@@ -66,7 +67,7 @@ int main(int argc, char** argv)
 			equalizarColor(frame);
 		}
 		if (GAUSSIANO) {
-			frame = aplicar_filtro(frame, filtro, dim_filtro, dim_filtro);
+			frame = aplicar_filtro(frame, filtro);
 		}
 		
 		if (frame.empty()) break; //Si algo falla, escapamos el bucle
@@ -181,6 +182,30 @@ void alien(Mat frame) {
 }
 
 /**
+ * Devuelve un array con los coefecientes de un filtro guassiano nxn con omega como parametro.
+ */
+double ** gauss(int alfa) {
+	double ** coef =(double **) malloc(n*sizeof(double *));
+	double sum = 0;
+
+	for (int i = 0; i < n; i++) {
+		coef[i] = (double *) malloc(n * sizeof(double));
+		for (int j = 0; j < n; j++) {
+			double termino = exp(-(i*i + j*j) / (2 * alfa*alfa));
+			coef[i][j] = termino;
+			sum = sum + termino;
+		}
+	}
+
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			coef[i][j] = coef[i][j] / sum;
+		}
+	}
+
+	return coef;
+}
+/**
  * Reduce el numero de colores en la imagen al numero especificado.
  */
 void poster(Mat frame, int numero_colores) {
@@ -200,7 +225,7 @@ void poster(Mat frame, int numero_colores) {
 /**
  * Aplica un filtro a una imagen.
  */
-Mat aplicar_filtro(Mat frame, double ** filtro, int len_x, int len_y) {
+Mat aplicar_filtro(Mat frame, double ** filtro) {
 	int rows = frame.rows, cols = frame.cols;
 	Mat resultado = frame.clone();
 
@@ -208,16 +233,18 @@ Mat aplicar_filtro(Mat frame, double ** filtro, int len_x, int len_y) {
 		for (int z = 0; z < cols; z++) {
 			Vec3b color(0, 0, 0); //Mejorable. Como coger el tipo de la matriz?
 
-			for (int x = 0; x < len_x; x++) {
-				for (int y = 0; y < len_y; y++) {
-					int indiceI = i + x - len_x / 2,
-						indiceZ = z + y - len_y / 2;
+			for (int x = 0; x < n; x++) {
+				for (int y = 0; y < n; y++) {
+					int indiceI = i + x - n / 2,
+						indiceZ = z + y - n / 2;
 					if ((indiceI > 0) && (indiceI < rows) && (indiceZ > 0) && (indiceZ < cols)) {
-						color = color + filtro[x][y]*frame.at<indiceI,indiceZ>;
+						//std::cout << "Intentamos: x:" << indiceI << " , y: " << indiceZ << std::endl;
+						color = color + filtro[x][y]
+							*frame.at<Vec3b>(indiceI,indiceZ);
 					}
 				}
 			}
-			resultado.at<i, z> = color;
+			resultado.at<Vec3b>(i,z) = color;
 		}
 	}
 
