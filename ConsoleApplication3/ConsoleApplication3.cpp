@@ -1,52 +1,77 @@
-// ConsoleApplication3.cpp: define el punto de entrada de la aplicación de consola.
+// Javier Fumanal Idocin, 684229
 //
 
 #include "stdafx.h"
 #include "opencv2/opencv.hpp"
 
+//Constantes
 #define PROFUNDIDAD 5
 #define TAMANO_FILTRO 5
+
 using namespace cv;
 
+//Funciones de efectos
 Mat distorsionar(Mat , float);
 void alien(Mat);
 void poster(Mat, int);
 void imageGhosting(Mat, double);
 void equalizarGris(Mat);
 void equalizarColor(Mat);
+void mejoraConstraste(Mat, double, double);
 double ** gauss(int);
 Mat aplicar_filtro(Mat, double ** );
+void on_trackbar0(int, void*);
+void on_trackbar1(int, void*);
+void on_trackbar2(int, void*);
 
-const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = false, ALIEN = false, POSTER = false, GHOSTING = false,
-GAUSSIANO = false, DISTORSION = false;
+//Efectos a activar.
+const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = false, ALIEN = true, POSTER = false, GHOSTING = false,
+GAUSSIANO = false, DISTORSION = false, AUMENTAR_CONTRASTE = false;
 
 Mat frameOriginal;
 Mat frameAnterior[PROFUNDIDAD];
 
 bool guarda = false;
 int frames_acumulados = 0;
+double tolerancias[] = { 0.3, 0.5, 0.2 };
+int t1 = 0, t2 = 0, t3 = 0;
 
 int main(int argc, char** argv)
 {
 	VideoCapture captura;
 	double ** filtro;
+
 	int omega = 2;
 	double alfa = 0.5;
 	int numero_colores = 230;
-	double k1 = -0.0000005;
+	double k1 = 256.0 / 10000000.0;
+	double alpha = 0.5, beta = 1;
 
 	// La 0 es la camara normal. 1 es la frontal
 	// La camara frontal (Webcam) Esta rota en la Surface.
 
 	if (!captura.open(0))
 		return -1;
+
+	namedWindow("Original", 0);
+	namedWindow("Modificada", 1);
 	if (GAUSSIANO) {
 		filtro = gauss(omega);
 	}
+	if (ALIEN) {
+		createTrackbar("R/G", "Modificada", &t1, 20, on_trackbar0);
+		createTrackbar("R/B", "Modificada", &t2, 20, on_trackbar0);
+		createTrackbar("G/B", "Modificada", &t3, 20, on_trackbar0);
+
+		/*on_trackbar0(t1, 0);
+		on_trackbar1(t2, 0);
+		on_trackbar2(t3, 0)*/;
+	}
+
 	while (true)
 	{
 		Mat frame, frameOriginal;
-
+		
 		captura >> frame;
 		frameOriginal = frame.clone();
 		
@@ -71,10 +96,14 @@ int main(int argc, char** argv)
 		if (GAUSSIANO) {
 			frame = aplicar_filtro(frame, filtro);
 		}
+		if (AUMENTAR_CONTRASTE) {
+			mejoraConstraste(frame, alpha, beta);
+		}
 		
 		if (frame.empty()) break; //Si algo falla, escapamos el bucle
 		imshow("Modificada", frame);
 		imshow("Original", frameOriginal);
+
 		if (waitKey(10) == 27) break; //Para con la tecla escape
 	}
 
@@ -83,12 +112,12 @@ int main(int argc, char** argv)
 
 /**
  * Aplica una distorsion a la imagen dada.
- * Si k > 0 -> Cojin, Si k < 0 -> Barril
+ * Si k > 0 -> Barril, Si k < 0 -> Cojin
  */
 Mat distorsionar(Mat imagenOrigen, float k1) {
 	Mat mapeoX, mapeoY, output;
-	double ptoPrincipalX = imagenOrigen.rows,
-		ptoPrincipalY = imagenOrigen.cols;
+	double ptoPrincipalX = imagenOrigen.rows/2,
+		ptoPrincipalY = imagenOrigen.cols/2;
 
 	mapeoX.create(imagenOrigen.size(), CV_32FC1);
 	mapeoY.create(imagenOrigen.size(), CV_32FC1);
@@ -159,7 +188,6 @@ void imageGhosting(Mat frame, double alfa) {
  */
 void alien(Mat frame) {
 	double proporciones_piel[] = { 255.0 / 219.0, 255.0 / 172.0, 219.0 / 172.0 }; //R/G, R/B, G/B
-	double tolerancias[] = { 0.3, 0.7, 0.2 };
 
 	for (int i = 0; i < frame.rows; i++) {
 		for (int z = 0; z < frame.cols; z++) {
@@ -172,7 +200,9 @@ void alien(Mat frame) {
 			if ((abs(proporcionRG - proporciones_piel[0]) < tolerancias[0]) &&
 				(abs(proporcionRB - proporciones_piel[1]) < tolerancias[1]) &&
 				(abs(proporcionGB - proporciones_piel[2]) < tolerancias[2]) &&
-				(abs(R - B) > 10)) {
+				(abs(R - B) > 10) &&
+				(abs(B - G) > 10) &&
+				(abs(R - G) > 5)) {
 				//std::cout << "Entro" << std::endl;
 				canales[0] = 0;
 				canales[1] = 0;
@@ -252,4 +282,30 @@ Mat aplicar_filtro(Mat frame, double ** filtro) {
 
 	return resultado;
 
+}
+
+/**
+ * Aumenta contraste de la imagen.
+ */
+void mejoraConstraste(Mat frame, double alpha, double beta){
+	std::vector<Mat> channels;
+
+	cvtColor(frame, frame, CV_BGR2YCrCb);
+	split(frame, channels);
+	channels[0] = channels[0] * alpha + beta;
+	merge(channels, frame);
+	cvtColor(frame, frame, CV_YCrCb2BGR);
+}
+
+void on_trackbar0(int, void*)
+{
+	tolerancias[0] = ((double) t1) / 10.0;
+}
+void on_trackbar1(int, void*)
+{
+	tolerancias[1] = ((double)t2) / 10.0;
+}
+void on_trackbar2(int, void*)
+{
+	tolerancias[2] = ((double)t3) / 10.0;
 }
