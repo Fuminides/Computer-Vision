@@ -11,7 +11,7 @@
 using namespace cv;
 
 //Funciones de efectos
-Mat distorsionar(Mat , float);
+Mat distorsionar(Mat , double, double);
 void alien(Mat);
 void poster(Mat, int);
 void imageGhosting(Mat, double);
@@ -23,10 +23,13 @@ Mat aplicar_filtro(Mat, double ** );
 void on_trackbar0(int, void*);
 void on_trackbar1(int, void*);
 void on_trackbar2(int, void*);
+void on_trackbar3(int, void*);
+void on_trackbar4(int, void*);
+void on_trackbar5(int, void*);
 
 //Efectos a activar.
-const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = false, ALIEN = true, POSTER = false, GHOSTING = false,
-GAUSSIANO = false, DISTORSION = false, AUMENTAR_CONTRASTE = false;
+const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = false, ALIEN = false, POSTER = false, GHOSTING = false,
+GAUSSIANO = false, DISTORSION = true, AUMENTAR_CONTRASTE = false;
 
 Mat frameOriginal;
 Mat frameAnterior[PROFUNDIDAD];
@@ -34,7 +37,10 @@ Mat frameAnterior[PROFUNDIDAD];
 bool guarda = false;
 int frames_acumulados = 0;
 double tolerancias[] = { 0.3, 0.5, 0.2 };
-int t1 = 0, t2 = 0, t3 = 0;
+int t1 = 0, t2 = 0, t3 = 0, modulo = 0, modulo2 = 0;
+int positivo = 0;
+double k1 = 0.0, k2 = 0.0;
+
 
 int main(int argc, char** argv)
 {
@@ -44,7 +50,6 @@ int main(int argc, char** argv)
 	int omega = 2;
 	double alfa = 0.5;
 	int numero_colores = 230;
-	double k1 = 256.0 / 10000000.0;
 	double alpha = 0.5, beta = 1;
 
 	// La 0 es la camara normal. 1 es la frontal
@@ -55,17 +60,19 @@ int main(int argc, char** argv)
 
 	namedWindow("Original", 0);
 	namedWindow("Modificada", 1);
+
 	if (GAUSSIANO) {
 		filtro = gauss(omega);
 	}
 	if (ALIEN) {
 		createTrackbar("R/G", "Modificada", &t1, 20, on_trackbar0);
-		createTrackbar("R/B", "Modificada", &t2, 20, on_trackbar0);
-		createTrackbar("G/B", "Modificada", &t3, 20, on_trackbar0);
-
-		/*on_trackbar0(t1, 0);
-		on_trackbar1(t2, 0);
-		on_trackbar2(t3, 0)*/;
+		createTrackbar("R/B", "Modificada", &t2, 20, on_trackbar1);
+		createTrackbar("G/B", "Modificada", &t3, 20, on_trackbar2);
+	}
+	if (DISTORSION) {
+		createTrackbar("K1: ", "Modificada", &modulo, 5, on_trackbar3);
+		createTrackbar("K2: ", "Modificada", &modulo2, 5, on_trackbar4);
+		createTrackbar("Signo: ", "Modificada", &positivo, 1, on_trackbar5);
 	}
 
 	while (true)
@@ -76,7 +83,7 @@ int main(int argc, char** argv)
 		frameOriginal = frame.clone();
 		
 		if (DISTORSION) {
-			frame = distorsionar(frame, k1);
+			frame = distorsionar(frame, k1, k2);
 		}
 		if (ALIEN) {
 			alien(frame);
@@ -114,7 +121,7 @@ int main(int argc, char** argv)
  * Aplica una distorsion a la imagen dada.
  * Si k > 0 -> Barril, Si k < 0 -> Cojin
  */
-Mat distorsionar(Mat imagenOrigen, float k1) {
+Mat distorsionar(Mat imagenOrigen, double k1, double k2) {
 	Mat mapeoX, mapeoY, output;
 	double ptoPrincipalX = imagenOrigen.rows/2,
 		ptoPrincipalY = imagenOrigen.cols/2;
@@ -127,8 +134,8 @@ Mat distorsionar(Mat imagenOrigen, float k1) {
 		for (int z = 0; z < cols; z++) {
 			double r_cuadrado = pow(i - ptoPrincipalX, 2) + pow(z - ptoPrincipalY,2);
 		
-			mapeoX.at<float>(i, z) = (z - ptoPrincipalY) * (1+ k1 * r_cuadrado) + ptoPrincipalY;
-			mapeoY.at<float>(i, z) = (i - ptoPrincipalX) * (1 + k1 * r_cuadrado) + ptoPrincipalX;
+			mapeoX.at<float>(i, z) = (z - ptoPrincipalY) * (1+ k1 * r_cuadrado + k2 * r_cuadrado * r_cuadrado) + ptoPrincipalY;
+			mapeoY.at<float>(i, z) = (i - ptoPrincipalX) * (1 + k1 * r_cuadrado + k2 * r_cuadrado * r_cuadrado) + ptoPrincipalX;
 		}
 	}
 
@@ -297,6 +304,9 @@ void mejoraConstraste(Mat frame, double alpha, double beta){
 	cvtColor(frame, frame, CV_YCrCb2BGR);
 }
 
+/**
+ * Funciones de trackbar para las tolerancias del color
+ */
 void on_trackbar0(int, void*)
 {
 	tolerancias[0] = ((double) t1) / 10.0;
@@ -308,4 +318,30 @@ void on_trackbar1(int, void*)
 void on_trackbar2(int, void*)
 {
 	tolerancias[2] = ((double)t3) / 10.0;
+}
+
+/**
+ * Trackbar para la distorsion
+ */
+void on_trackbar3(int, void*) //Modulo de k1
+{
+	k1 = ((k1>=0)-(k1<0)) * (double(modulo) / 1000000.0);
+	std::cout << "K1: " << k1 << " K2: " << k2 << std::endl;
+}
+void on_trackbar4(int, void*) //Modulo de k2
+{
+	k2 = ((k2>=0) - (k2<0)) * (double(modulo2) / 1000000.0);
+	std::cout << "K1: " << k1 << " K2: " << k2 << std::endl;
+}
+void on_trackbar5(int, void*) //Signo de las k
+{
+	if (positivo == 0) {
+		k1 = abs(k1);
+		k2 = abs(k2);
+	}
+	else {
+		k1 = -abs(k1);
+		k2 = -abs(k2);
+	}
+	std::cout << "K1: " << k1 << " K2: " << k2 << std::endl;
 }
