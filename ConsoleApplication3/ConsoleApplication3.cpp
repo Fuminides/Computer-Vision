@@ -5,7 +5,7 @@
 #include "opencv2/opencv.hpp"
 
 #define PROFUNDIDAD 5
-#define n 5
+#define TAMANO_FILTRO 5
 using namespace cv;
 
 Mat distorsionar(Mat , float);
@@ -17,27 +17,29 @@ void equalizarColor(Mat);
 double ** gauss(int);
 Mat aplicar_filtro(Mat, double ** );
 
-const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = true, ALIEN = false, POSTER = false, GHOSTING = false,
-GAUSSIANO = true, DISTORSION = false;
+const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = false, ALIEN = false, POSTER = false, GHOSTING = false,
+GAUSSIANO = false, DISTORSION = false;
 
 Mat frameOriginal;
 Mat frameAnterior[PROFUNDIDAD];
+
 bool guarda = false;
 int frames_acumulados = 0;
-double alfa = 0.9;
-int numero_colores = 230;
-double k1 = -0.0000005;
 
 int main(int argc, char** argv)
 {
-	VideoCapture cap;
+	VideoCapture captura;
 	double ** filtro;
-	int dim_filtro = 3, omega = 5;
+	int omega = 2;
+	double alfa = 0.5;
+	int numero_colores = 230;
+	double k1 = -0.0000005;
+
 	// La 0 es la camara normal. 1 es la frontal
 	// La camara frontal (Webcam) Esta rota en la Surface.
 
-	if (!cap.open(0))
-		return 0;
+	if (!captura.open(0))
+		return -1;
 	if (GAUSSIANO) {
 		filtro = gauss(omega);
 	}
@@ -45,7 +47,7 @@ int main(int argc, char** argv)
 	{
 		Mat frame, frameOriginal;
 
-		cap >> frame;
+		captura >> frame;
 		frameOriginal = frame.clone();
 		
 		if (DISTORSION) {
@@ -133,11 +135,11 @@ void equalizarColor(Mat frame) {
  */
 void imageGhosting(Mat frame, double alfa) {
 	if (guarda) {
-		frameAnterior[PROFUNDIDAD - 1] = frameAnterior[PROFUNDIDAD - 1] / double(PROFUNDIDAD);
+		frameAnterior[PROFUNDIDAD - 1] = (frameAnterior[PROFUNDIDAD - 1]*alfa / double(PROFUNDIDAD));
 		for (int i = 0; i < PROFUNDIDAD - 1; i++) {
-			frameAnterior[PROFUNDIDAD - 1] += frameAnterior[i] / double(PROFUNDIDAD);
+			frameAnterior[PROFUNDIDAD - 1] += frameAnterior[i]*alfa / double(PROFUNDIDAD);
 		}
-		frame = frame*(1 - alfa) + frameAnterior[PROFUNDIDAD - 1] * alfa;
+		frame = frame*(1 - alfa) + frameAnterior[PROFUNDIDAD - 1];
 	}
 	else {
 		frames_acumulados++;
@@ -147,7 +149,7 @@ void imageGhosting(Mat frame, double alfa) {
 	}
 
 	for (int i = 0; i < PROFUNDIDAD - 1; i++) {
-		frameAnterior[i + 1] = frameAnterior[i];
+		frameAnterior[i + 1] = frameAnterior[i].clone();
 	}
 	frameAnterior[0] = frame.clone();
 }
@@ -185,20 +187,20 @@ void alien(Mat frame) {
  * Devuelve un array con los coefecientes de un filtro guassiano nxn con omega como parametro.
  */
 double ** gauss(int alfa) {
-	double ** coef =(double **) malloc(n*sizeof(double *));
+	double ** coef =(double **) malloc(TAMANO_FILTRO*sizeof(double *));
 	double sum = 0;
 
-	for (int i = 0; i < n; i++) {
-		coef[i] = (double *) malloc(n * sizeof(double));
-		for (int j = 0; j < n; j++) {
+	for (int i = 0; i < TAMANO_FILTRO; i++) {
+		coef[i] = (double *) malloc(TAMANO_FILTRO * sizeof(double));
+		for (int j = 0; j < TAMANO_FILTRO; j++) {
 			double termino = exp(-(i*i + j*j) / (2 * alfa*alfa));
 			coef[i][j] = termino;
 			sum = sum + termino;
 		}
 	}
 
-	for (int i = 0; i < n; i++) {
-		for (int j = 0; j < n; j++) {
+	for (int i = 0; i < TAMANO_FILTRO; i++) {
+		for (int j = 0; j < TAMANO_FILTRO; j++) {
 			coef[i][j] = coef[i][j] / sum;
 		}
 	}
@@ -233,10 +235,10 @@ Mat aplicar_filtro(Mat frame, double ** filtro) {
 		for (int z = 0; z < cols; z++) {
 			Vec3b color(0, 0, 0); //Mejorable. Como coger el tipo de la matriz?
 
-			for (int x = 0; x < n; x++) {
-				for (int y = 0; y < n; y++) {
-					int indiceI = i + x - n / 2,
-						indiceZ = z + y - n / 2;
+			for (int x = 0; x < TAMANO_FILTRO; x++) {
+				for (int y = 0; y < TAMANO_FILTRO; y++) {
+					int indiceI = i + x - TAMANO_FILTRO / 2,
+						indiceZ = z + y - TAMANO_FILTRO / 2;
 					if ((indiceI > 0) && (indiceI < rows) && (indiceZ > 0) && (indiceZ < cols)) {
 						//std::cout << "Intentamos: x:" << indiceI << " , y: " << indiceZ << std::endl;
 						color = color + filtro[x][y]

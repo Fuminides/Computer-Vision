@@ -1,12 +1,12 @@
 ﻿  ConsoleApplication3.cpp
-ConsoleApplication3.cpp(52): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
-ConsoleApplication3.cpp(99): warning C4244: '=': conversión de 'double' a 'float'; posible pérdida de datos
-ConsoleApplication3.cpp(100): warning C4244: '=': conversión de 'double' a 'float'; posible pérdida de datos
-ConsoleApplication3.cpp(217): warning C4244: '=': conversión de 'double' a 'uchar'; posible pérdida de datos
-ConsoleApplication3.cpp(218): warning C4244: '=': conversión de 'double' a 'uchar'; posible pérdida de datos
+ConsoleApplication3.cpp(54): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
+ConsoleApplication3.cpp(101): warning C4244: '=': conversión de 'double' a 'float'; posible pérdida de datos
+ConsoleApplication3.cpp(102): warning C4244: '=': conversión de 'double' a 'float'; posible pérdida de datos
 ConsoleApplication3.cpp(219): warning C4244: '=': conversión de 'double' a 'uchar'; posible pérdida de datos
+ConsoleApplication3.cpp(220): warning C4244: '=': conversión de 'double' a 'uchar'; posible pérdida de datos
+ConsoleApplication3.cpp(221): warning C4244: '=': conversión de 'double' a 'uchar'; posible pérdida de datos
   Generando código
-  9 of 272 functions ( 3.3%) were compiled, the rest were copied from previous compilation.
+  8 of 271 functions ( 3.0%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     0 functions had inline decision re-evaluated but remain unchanged
   Generación de código finalizada
