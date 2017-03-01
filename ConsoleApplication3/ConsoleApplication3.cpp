@@ -6,7 +6,7 @@
 
 //Constantes
 #define PROFUNDIDAD 5
-#define TAMANO_FILTRO 5
+#define TAMANO_FILTRO 4
 
 using namespace cv;
 
@@ -17,9 +17,12 @@ void poster(Mat, int);
 void imageGhosting(Mat, double);
 void equalizarGris(Mat);
 void equalizarColor(Mat);
-void mejoraConstraste(Mat, double, double);
+void comic(Mat, double, double);
+void aumentarConstraste(Mat, double, double);
 double ** gauss(int);
 Mat aplicar_filtro(Mat, double ** );
+void histograma(Mat, std::string);
+void histogramaGris(Mat,std::string);
 void on_trackbar0(int, void*);
 void on_trackbar1(int, void*);
 void on_trackbar2(int, void*);
@@ -28,8 +31,8 @@ void on_trackbar4(int, void*);
 void on_trackbar5(int, void*);
 
 //Efectos a activar.
-const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = false, ALIEN = false, POSTER = false, GHOSTING = false,
-GAUSSIANO = false, DISTORSION = true, AUMENTAR_CONTRASTE = false;
+const bool ECUALIZAR_GREY = false, ECUALIZAR_COLOR = false, ALIEN = true, POSTER = false, GHOSTING = false,
+GAUSSIANO = false, DISTORSION = false, AUMENTAR_CONTRASTE = false, COMIC = false;
 
 Mat frameOriginal;
 Mat frameAnterior[PROFUNDIDAD];
@@ -47,10 +50,10 @@ int main(int argc, char** argv)
 	VideoCapture captura;
 	double ** filtro;
 
-	int omega = 2;
-	double alfa = 0.5;
-	int numero_colores = 230;
-	double alpha = 0.5, beta = 1;
+	int omega = 5;
+	double alfa = 0.8;
+	int numero_colores = 16;
+	double alpha = 0.25, beta = 20;
 
 	// La 0 es la camara normal. 1 es la frontal
 	// La camara frontal (Webcam) Esta rota en la Surface.
@@ -103,13 +106,20 @@ int main(int argc, char** argv)
 		if (GAUSSIANO) {
 			frame = aplicar_filtro(frame, filtro);
 		}
+		if (COMIC) {
+			comic(frame, alpha, beta);
+		}
 		if (AUMENTAR_CONTRASTE) {
-			mejoraConstraste(frame, alpha, beta);
+			aumentarConstraste(frame, alpha, beta);
 		}
 		
 		if (frame.empty()) break; //Si algo falla, escapamos el bucle
-		imshow("Modificada", frame);
-		imshow("Original", frameOriginal);
+		if (!ECUALIZAR_GREY) {
+			imshow("Modificada", frame);
+			histograma(frame, "Histograma Modificada");
+			imshow("Original", frameOriginal);
+			histograma(frameOriginal, "Histograma Original");
+		}
 
 		if (waitKey(10) == 27) break; //Para con la tecla escape
 	}
@@ -151,6 +161,10 @@ void equalizarGris(Mat frame) {
 	cvtColor(frame, frame, CV_BGR2GRAY);
 	frameOriginal = frame.clone();
 	equalizeHist(frame, frame);
+	histogramaGris(frame, "Frame modificado");
+	histogramaGris(frameOriginal, "Frame original");
+	imshow("Modificada", frame);
+	imshow("Original", frameOriginal);
 }
 
 /**
@@ -194,7 +208,7 @@ void imageGhosting(Mat frame, double alfa) {
  * Aplica el efecto "alien" a la imagen
  */
 void alien(Mat frame) {
-	double proporciones_piel[] = { 255.0 / 219.0, 255.0 / 172.0, 219.0 / 172.0 }; //R/G, R/B, G/B
+	double proporciones_piel[] = { 234.0 / 192.0, 234.0 / 134.0, 192.0 / 134.0 }; //R/G, R/B, G/B
 
 	for (int i = 0; i < frame.rows; i++) {
 		for (int z = 0; z < frame.cols; z++) {
@@ -246,8 +260,10 @@ double ** gauss(int alfa) {
 }
 /**
  * Reduce el numero de colores en la imagen al numero especificado.
+ * Codigo sacado de: http://answers.opencv.org/question/27808/how-can-you-use-k-means-clustering-to-posterize-an-image-using-c/
  */
-void poster(Mat frame, int numero_colores) {
+void poster(Mat src, int numero_colores) {
+	/*
 	for (int i = 0; i < frame.rows; i++) {
 		for (int z = 0; z < frame.cols; z++) {
 			Vec3b canales = frame.at<Vec3b>(i, z);
@@ -258,7 +274,26 @@ void poster(Mat frame, int numero_colores) {
 			canales[2] = R % numero_colores *1.0 / numero_colores * 255;
 			frame.at<Vec3b>(i, z) = canales;
 		}
-	}
+	}*/
+	Mat samples(src.rows * src.cols, 3, CV_32F);
+	for (int y = 0; y < src.rows; y++)
+		for (int x = 0; x < src.cols; x++)
+			for (int z = 0; z < 3; z++)
+				samples.at<float>(y + x*src.rows, z) = src.at<Vec3b>(y, x)[z];
+	int clusterCount = numero_colores;
+	Mat labels;
+	int attempts = 2;
+	Mat centers;
+	kmeans(samples, clusterCount, labels, TermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 5, 0.01), attempts, KMEANS_PP_CENTERS, centers);
+
+	for (int y = 0; y < src.rows; y++)
+		for (int x = 0; x < src.cols; x++)
+		{
+			int cluster_idx = labels.at<int>(y + x*src.rows, 0);
+			src.at<Vec3b>(y, x)[0] = centers.at<float>(cluster_idx, 0);
+			src.at<Vec3b>(y, x)[1] = centers.at<float>(cluster_idx, 1);
+			src.at<Vec3b>(y, x)[2] = centers.at<float>(cluster_idx, 2);
+		}
 }
 
 /**
@@ -294,16 +329,127 @@ Mat aplicar_filtro(Mat frame, double ** filtro) {
 /**
  * Aumenta contraste de la imagen.
  */
-void mejoraConstraste(Mat frame, double alpha, double beta){
+void comic(Mat frame, double alpha, double beta){
 	std::vector<Mat> channels;
+	Mat brillantes, brillantes_float;
 
+	cvtColor(frame, frame, CV_BGR2YCrCb);
+	split(frame, channels);
+	threshold(channels[0], brillantes, beta, 1, 0);
+	for (int i = 0; i < brillantes.size[0]; i++) {
+		for (int z = 0; z < brillantes.size[1]; z++) {
+			char resultado = channels[0].at<char>(i, z) + channels[0].at<char>(i, z)*(brillantes.at<char>(i,z) * 2 - 1)*alpha;
+			if (resultado != 0) channels[0].at<char>(i, z) = resultado;
+		}
+	}
+	merge(channels, frame);
+	cvtColor(frame, frame, CV_YCrCb2BGR);
+}
+void aumentarConstraste(Mat frame, double alpha, double beta) {
+	std::vector<Mat> channels;
 	cvtColor(frame, frame, CV_BGR2YCrCb);
 	split(frame, channels);
 	channels[0] = channels[0] * alpha + beta;
 	merge(channels, frame);
 	cvtColor(frame, frame, CV_YCrCb2BGR);
 }
+/**
+ * Muestra el histograma por pantalla de la imagen dada.
+ */
+void histograma(Mat src, std::string nombre) {
+	std::vector<Mat> bgr_planes;
+	split(src, bgr_planes);
 
+	/// Establish the number of bins
+	int histSize = 256;
+
+	/// Set the ranges ( for B,G,R) )
+	float range[] = { 0, 256 };
+	const float* histRange = { range };
+
+	bool uniform = true; bool accumulate = false;
+
+	Mat b_hist, g_hist, r_hist;
+
+	/// Compute the histograms:
+	calcHist(&bgr_planes[0], 1, 0, Mat(), b_hist, 1, &histSize, &histRange, uniform, accumulate);
+	calcHist(&bgr_planes[1], 1, 0, Mat(), g_hist, 1, &histSize, &histRange, uniform, accumulate);
+	calcHist(&bgr_planes[2], 1, 0, Mat(), r_hist, 1, &histSize, &histRange, uniform, accumulate);
+
+	// Draw the histograms for B, G and R
+	int hist_w = 512; int hist_h = 400;
+	int bin_w = cvRound((double)hist_w / histSize);
+
+	Mat histImage(hist_h, hist_w, CV_8UC3, Scalar(0, 0, 0));
+
+	/// Normalize the result to [ 0, histImage.rows ]
+	normalize(b_hist, b_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+	normalize(g_hist, g_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+	normalize(r_hist, r_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+
+	/// Draw for each channel
+	for (int i = 1; i < histSize; i++)
+	{
+		line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(b_hist.at<float>(i - 1))),
+			Point(bin_w*(i), hist_h - cvRound(b_hist.at<float>(i))),
+			Scalar(255, 0, 0), 2, 8, 0);
+		line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(g_hist.at<float>(i - 1))),
+			Point(bin_w*(i), hist_h - cvRound(g_hist.at<float>(i))),
+			Scalar(0, 255, 0), 2, 8, 0);
+		line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(r_hist.at<float>(i - 1))),
+			Point(bin_w*(i), hist_h - cvRound(r_hist.at<float>(i))),
+			Scalar(0, 0, 255), 2, 8, 0);
+	}
+
+	/// Display
+	namedWindow(nombre, CV_WINDOW_AUTOSIZE);
+	imshow(nombre, histImage);
+
+}
+
+/**
+* Muestra el histograma por pantalla de la imagen dada.
+*/
+void histogramaGris(Mat src, std::string nombre) {
+	std::vector<Mat> bgr_planes;
+	split(src, bgr_planes);
+
+	/// Establish the number of bins
+	int histSize = 256;
+
+	/// Set the ranges ( for B,G,R) )
+	float range[] = { 0, 256 };
+	const float* histRange = { range };
+
+	bool uniform = true; bool accumulate = false;
+
+	Mat b_hist, g_hist, r_hist;
+
+	/// Compute the histograms:
+	calcHist(&bgr_planes[0], 1, 0, Mat(), b_hist, 1, &histSize, &histRange, uniform, accumulate);
+
+	// Draw the histograms for B, G and R
+	int hist_w = 512; int hist_h = 400;
+	int bin_w = cvRound((double)hist_w / histSize);
+
+	Mat histImage(hist_h, hist_w, CV_8UC3, Scalar(0, 0, 0));
+
+	/// Normalize the result to [ 0, histImage.rows ]
+	normalize(b_hist, b_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+
+	/// Draw for each channel
+	for (int i = 1; i < histSize; i++)
+	{
+		line(histImage, Point(bin_w*(i - 1), hist_h - cvRound(b_hist.at<float>(i - 1))),
+			Point(bin_w*(i), hist_h - cvRound(b_hist.at<float>(i))),
+			Scalar(255, 255, 255), 2, 8, 0);
+	}
+
+	/// Display
+	namedWindow(nombre, CV_WINDOW_AUTOSIZE);
+	imshow(nombre, histImage);
+
+}
 /**
  * Funciones de trackbar para las tolerancias del color
  */
