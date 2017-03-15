@@ -2,11 +2,12 @@
 */
 #include "stdafx.h"
 #include "opencv2/opencv.hpp"
+#include <cstdio>
 
 using namespace cv;
 using namespace std;
 //VARIABLES GLOBALES
-#define VERBOSO true
+#define VERBOSO false
 #define ADAPTATIVE true
 
 struct Muestra
@@ -80,32 +81,6 @@ void histogramaGris(Mat src, std::string nombre) {
 
 }
 
-/**
- * Devuelve el numero de picos presentes en el histograma dado.
- */
-int numeroPicos(int * histograma_gris) {
-	int numero_picos = 0, anterior = 0, actual;
-	bool creciendo = false;
-
-	for (int i = 0; i < 255; i++) {
-		actual = histograma_gris[i];
-		if (creciendo) {
-			if (actual < anterior) {
-				creciendo = false;
-				numero_picos++;
-			}
-		}
-		else {
-			if (actual > (anterior+1)*2) {
-				creciendo = true;
-			}
-		}
-		anterior = actual;
-	}
-
-	return numero_picos;
-}
-
 //MAIN
 int main(int argc, char** argv)
 {
@@ -114,7 +89,7 @@ int main(int argc, char** argv)
 	int recorte = 3;
 	vector<vector<Point> > contours;
 	RNG rng(12345);
-
+	
 	imagen = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
 
 	if (VERBOSO) imshow("Original", imagen);
@@ -169,14 +144,15 @@ int main(int argc, char** argv)
 			if (waitKey(10) == 27) break; //Para con la tecla escape
 	}
 	else {
-		if (contours.size() > 1) cout << "WARNING: mas de un contorno encontrado" << "\n";
+		if (contours.size() > 1) {
+			cout << "WARNING: mas de un contorno encontrado en entrenamiento" << endl;
+			return -1;
+		}
+		FILE * pFile;
+		pFile = fopen("objetos", "a");
 
 		for (int i = 0; i < contours.size(); i++) {
-			Muestra muestra;
-			muestra.momento0 = mu[i].m00;
-			muestra.momento1 = mu[i].m01;
-			muestra.momento2 = mu[i].m02;
-			muestra.perimetro = arcLength(contours[i], true);
+			fprintf(pFile, "%s %f %f %f %f\r\n", argv[2], mu[i].m00, mu[i].m01, mu[i].m02, arcLength(contours[i], true));
 		}
 	}
 
