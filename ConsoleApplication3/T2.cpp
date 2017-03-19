@@ -8,7 +8,7 @@ using namespace cv;
 using namespace std;
 //VARIABLES GLOBALES
 #define VERBOSO false
-#define ADAPTATIVE true
+#define OTSU false
 
 struct Muestra
 {
@@ -16,27 +16,31 @@ struct Muestra
 	double momento1;
 	double momento2;
 	double perimetro;
+	int label;
 };
+
+int labelToInt(std::string label)
+{
+	if (label.compare("circulo") == 0) {
+		return 1;
+	}
+	else if (label.compare("rectangulo") == 0) {
+		return 2;
+	}
+	else if (label.compare("rueda") == 0) {
+		return 3;
+	}
+	else if (label.compare("triangulo") == 0) {
+		return 4;
+	}
+	else if (label.compare("vagon") == 0) {
+		return 5;
+	}
+}
 //FUNCIONES
 /**
 * Calcula el histograma de una imagen en blanco y negro.
 */
-int * histogramaGrisManualCalc(Mat src) {
-	static int resultado[255];
-	for (int i = 0; i < 255; i++) {
-		resultado[i] = 0;
-	}
-	for (int i = 0; i < src.rows; i++) {
-		for (int z = 0; z < src.cols; z++) {
-			int indice = src.at<uchar>(i, z);
-			//cout << "Ind: " << to_string(indice) << endl;
-			resultado[indice] = resultado[indice] + 1;
-		}
-	}
-
-	return resultado;
-	
-}
 /**
 * Muestra el histograma por pantalla de la imagen dada.
 */
@@ -81,12 +85,26 @@ void histogramaGris(Mat src, std::string nombre) {
 
 }
 
+/**
+ * Umbraliza la imagen
+ */
+void umbralizar(Mat imagen) {
+	if (OTSU) {
+		//Otsu
+		threshold(imagen, imagen, 0, 255, THRESH_BINARY_INV + THRESH_OTSU);
+	}
+	else if (!OTSU) {
+		//Adaptativo
+		adaptiveThreshold(imagen, imagen, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 87, 2);
+	}
+}
+
 //MAIN
-int main(int argc, char** argv)
+int main2(int argc, char** argv)
 {
 	Mat imagen, destino;
 	int * histograma;
-	int recorte = 3;
+	int recorte = 5;
 	vector<vector<Point> > contours;
 	RNG rng(12345);
 	
@@ -101,14 +119,7 @@ int main(int argc, char** argv)
 		histogramaGris(imagen, "Histo");
 	}
 
-	if (ADAPTATIVE) {
-		//Otsu
-		threshold(imagen,imagen, 0, 255, THRESH_BINARY_INV + THRESH_OTSU);
-	}
-	else if (!ADAPTATIVE) {
-		//Adaptativo
-		adaptiveThreshold(imagen, imagen, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV,87,2);
-	}
+	umbralizar(imagen);
 	
 	findContours(imagen, contours, RETR_EXTERNAL,CHAIN_APPROX_NONE);
 	/// Get the moments
@@ -117,42 +128,43 @@ int main(int argc, char** argv)
 	for (int i = 0; i < contours.size(); i++)
 	{
 		mu[i] = moments(contours[i], false);
+		
 	}
-
+	if (VERBOSO){
 	///  Get the mass centers:
-	vector<Point2f> mc(contours.size());
-	for (int i = 0; i < contours.size(); i++)
-	{
-		mc[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
-	}
+		vector<Point2f> mc(contours.size());
+		for (int i = 0; i < contours.size(); i++)
+		{
+			mc[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+		}
 
-	/// Draw contours
-	Mat drawing = Mat::zeros(imagen.size(), CV_8UC3);
-	for (int i = 0; i< contours.size(); i++)
-	{
-		Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
-		drawContours(drawing, contours, i, color, 2, 8);
-		circle(drawing, mc[i], 4, color, -1, 8, 0);
-	}
+		/// Draw contours
+		Mat drawing = Mat::zeros(imagen.size(), CV_8UC3);
+		for (int i = 0; i< contours.size(); i++)
+		{
+			Scalar color = Scalar(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
+			drawContours(drawing, contours, i, color, 2, 8);
+			circle(drawing, mc[i], 4, color, -1, 8, 0);
+		}
 
-	/// Show in a window
-	if (VERBOSO) {
 		imshow("Umbralizada", imagen);
 		imshow("Contours", drawing);
+		cout << "m0: " << mu[0].m00 << " m1: " << (mu[0].mu20+ mu[0].mu02) << " m2: " << (mu[0].mu20 + mu[0].mu02)*(mu[0].mu20 + mu[0].mu02) + 4 * mu[0].mu11*mu[0].mu11 << " perimetro: " << arcLength(contours[0], true) << endl;
 
+		cout << "Numero de figuras: " << contours.size() << endl;
 		while (true)
 			if (waitKey(10) == 27) break; //Para con la tecla escape
 	}
 	else {
 		if (contours.size() > 1) {
 			cout << "WARNING: mas de un contorno encontrado en entrenamiento" << endl;
-			return -1;
+			//return -1;
 		}
 		FILE * pFile;
 		pFile = fopen("objetos", "a");
 
 		for (int i = 0; i < contours.size(); i++) {
-			fprintf(pFile, "%s %f %f %f %f\r\n", argv[2], mu[i].m00, mu[i].m01, mu[i].m02, arcLength(contours[i], true));
+			if (arcLength(contours[i], true) > 5) fprintf(pFile, "%f %f %f %f \r", mu[i].m00, mu[i].mu20 + mu[i].mu02, (mu[i].mu20 + mu[i].mu02)*(mu[i].mu20 + mu[i].mu02)+4*mu[i].mu11*mu[i].mu11, arcLength(contours[i], true));
 		}
 	}
 

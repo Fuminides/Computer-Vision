@@ -1,0 +1,15 @@
+# Created by Octave 4.0.0, Sat Mar 18 12:43:19 2017 Hora estándar romance <unknown@DESKTOP-8EDJDS7>
+# name: medias
+# type: matrix
+# rows: 1
+# columns: 4
+ 1889.7 199218.5333334 26718619.9166664 162.9131154
+
+
+# name: varianzas
+# type: matrix
+# rows: 1
+# columns: 4
+ 984.45 13224574598.83143 684563850282699 1.772583506891817
+
+
