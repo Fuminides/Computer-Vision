@@ -1,10 +1,11 @@
-﻿  Source.cpp
-Source.cpp(26): warning C4800: 'int': forzando el valor a bool 'true' o 'false' (advertencia de rendimiento)
-Source.cpp(107): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
+﻿  clasificar.cpp
+clasificar.cpp(108): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
   Generando código
-  7 of 533 functions ( 1.3%) were compiled, the rest were copied from previous compilation.
+c:\users\javi-\documents\visual studio 2015\projects\consoleapplication3\consoleapplication3\clasificar.cpp(149): warning C4715: 'mainClasificar': no todas las rutas de acceso de control devuelven un valor
+c:\users\javi-\documents\visual studio 2015\projects\consoleapplication3\consoleapplication3\aprender.cpp(176): warning C4715: 'mainAprender': no todas las rutas de acceso de control devuelven un valor
+  13 of 572 functions ( 2.3%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    5 functions had inline decision re-evaluated but remain unchanged
+    2 functions had inline decision re-evaluated but remain unchanged
   Generación de código finalizada
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.exe
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.pdb (Full PDB)

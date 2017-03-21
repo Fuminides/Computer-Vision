@@ -3,11 +3,14 @@ M = load('objetos');
 numero_elementos_clase = 5; #Usar matriz si cada elemento tiene distinto numero.
 format long g
 
-circulos = M(1:5,:);
-rectangulos = M(6:10,:);
-ruedas =M(11:15,:);
-triangulos =M(16:20,:);
-vagon = M(21:25,:);
+#Me tomo una pequena licencia: se en que orden voy a poner las muestras,
+#asi que me ahorro leer las labels y tener que hacer cosas mas complicadas
+#para sacar los arrays de cada clase.
+circulos = M(1:5,1:end-1);
+rectangulos = M(6:10,1:end-1);
+ruedas =M(11:15,1:end-1);
+triangulos =M(16:20,1:end-1);
+vagon = M(21:25,1:end-1);
 
 circulos_medias = mean(circulos);
 circulos_varianzas = var(circulos);
