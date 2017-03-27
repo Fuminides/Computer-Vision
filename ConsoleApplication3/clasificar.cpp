@@ -8,7 +8,7 @@
 using namespace cv;
 using namespace std;
 
-#define CHI_CUADRADA_4 13.277
+#define CHI_CUADRADA_4 11.07
 #define REDUCIR_SESGO 2.0
 
 //Declaracion de funciones externas
@@ -38,9 +38,13 @@ std::string intToLabel(int label)
 /**
  * Devuelve la distancia de mahalanobis de un valor, dado su media y varianza.
  */
-double distanciaMahalanobis(double valor, double media, double varianza) 
+double distanciaMahalanobis(double valor, double numero, double media, double varianza) 
 {
-	return (valor - media)*(valor - media) / (varianza+(varianza*REDUCIR_SESGO)+REDUCIR_SESGO);
+	//cout << "varianza: " << varianza << endl;
+	double varianza_nueva = ((media*0.01)*(media*0.01)/numero) + ((numero-1.0)/numero)*varianza;
+	//cout << "Varianza_nueva " << varianza_nueva << endl;
+
+	return (valor - media)*(valor - media) / (varianza_nueva);
 }
 
 /**
@@ -53,23 +57,26 @@ double reconocido(char * nombre_fichero, double area, double hu[10], double peri
 		cerr << "Ruta incorrecta, revisar fichero.\n";
 	}
 
-	double m1, m2, m3, m4, v1, v2, v3, v4;
+	double m1, m2, m3, m4, m5, v1, v2, v3, v4, v5;
 	
 	source >> m1;
 	source >> m2;
 	source >> m3;
 	source >> m4;
+	source >> m5;
 
 	source >> v1;
 	source >> v2;
 	source >> v3;
 	source >> v4;
+	source >> v5;
 
 	double acum = 0;
-	acum += distanciaMahalanobis(area, m1, v1);
-	acum += distanciaMahalanobis(hu[0], m2, v2);
-	acum += distanciaMahalanobis(hu[1], m3, v3);
-	acum += distanciaMahalanobis(perimetro, m4, v4);
+	acum += distanciaMahalanobis(area, 5.0, m1, v1+0.000001);
+	acum += distanciaMahalanobis(hu[0], 5.0, m2, v2+0.000001);
+	acum += distanciaMahalanobis(hu[1], 5.0, m3, v3+0.000001);
+	acum += distanciaMahalanobis(hu[2], 5.0, m4, v4+0.000001);
+	acum += distanciaMahalanobis(perimetro, 5.0, m5, v5+0.000001);
 
 	return acum;
 }
@@ -113,12 +120,14 @@ int mainClasificar(int argc, char** argv)
 			predict[2] = reconocido(medias_vagon, mu.m00, hu, perimetro);
 			predict[3] = reconocido(medias_rueda, mu.m00, hu, perimetro);
 			predict[4] = reconocido(medias_circulo, mu.m00, hu, perimetro);
+
+			//Para imprimir las distancias de mahalanobis
 			cout << predict[0] << endl;
 			cout << predict[1] << endl;
-
 			cout << predict[2] << endl;
 			cout << predict[3] << endl;
 			cout << predict[4] << endl;
+			
 
 			for (int i = 0; i < 5; i++) {
 				if (predict[i] < CHI_CUADRADA_4) {

@@ -29,10 +29,7 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Archivos de código fuente</Filter>
     </ClCompile>
-    <ClCompile Include="clasificar.cpp">
-      <Filter>Archivos de código fuente</Filter>
-    </ClCompile>
-    <ClCompile Include="aprender.cpp">
+    <ClCompile Include="Contornos.cpp">
       <Filter>Archivos de código fuente</Filter>
     </ClCompile>
   </ItemGroup>

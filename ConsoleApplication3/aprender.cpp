@@ -9,8 +9,7 @@ using namespace std;
 
 //VARIABLES GLOBALES
 #define VERBOSO true
-#define OTSU true
-
+extern bool OTSU;
 //Declaraciones de funciones en el otro fichero
 int mainClasificar(int argc, char** argv);
 
@@ -102,7 +101,7 @@ void umbralizar(Mat imagen) {
 }
 
 //MAIN
-int mainAprender(int argc, char** argv)
+int main2(int argc, char** argv)
 {
 	Mat imagen, destino;
 	int * histograma;
@@ -169,17 +168,17 @@ int mainAprender(int argc, char** argv)
 
 		//Puede ser que algún pixel suelto se detecte como un contorno, aquí los filtramos.
 		for (int i = 0; i < contours.size(); i++) {
-			if (arcLength(contours[i], true) > 7) fprintf(pFile, "%f %f %f %f %d\r", mu[i].m00, hu[i][0], hu[i][1], arcLength(contours[i], true), labelToInt(argv[2]));
+			if (arcLength(contours[i], true) > 7) fprintf(pFile, "%f %f %f %f %.2f %d\r", mu[i].m00, hu[i][0], hu[i][1], hu[i][2],arcLength(contours[i], true), labelToInt(argv[2]));
 		}
 	}
 
 }
 
-void main(int argc, char ** argv) {
+/*void main4(int argc, char ** argv) {
 	if (strcmp(argv[2],"-c") == 0) {
 		mainClasificar(argc, argv);
 	}
 	else {
 		mainAprender(argc, argv);
 	}
-}
+}*/

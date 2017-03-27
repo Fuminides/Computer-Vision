@@ -1,11 +1,12 @@
-﻿  clasificar.cpp
-clasificar.cpp(108): warning C4244: 'argumento': conversión de 'double' a 'float'; posible pérdida de datos
+﻿  Contornos.cpp
+Contornos.cpp(86): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(87): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(90): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(125): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
   Generando código
-c:\users\javi-\documents\visual studio 2015\projects\consoleapplication3\consoleapplication3\clasificar.cpp(149): warning C4715: 'mainClasificar': no todas las rutas de acceso de control devuelven un valor
-c:\users\javi-\documents\visual studio 2015\projects\consoleapplication3\consoleapplication3\aprender.cpp(176): warning C4715: 'mainAprender': no todas las rutas de acceso de control devuelven un valor
-  13 of 572 functions ( 2.3%) were compiled, the rest were copied from previous compilation.
+  6 of 267 functions ( 2.2%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    2 functions had inline decision re-evaluated but remain unchanged
+    1 functions had inline decision re-evaluated but remain unchanged
   Generación de código finalizada
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.exe
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.pdb (Full PDB)
