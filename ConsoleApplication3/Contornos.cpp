@@ -115,6 +115,7 @@ void main(int argc, char ** argv) {
 	imshow("Contornos Theta", Theta );
 	imshow("Contornos Modulos", Modulos_dibujar);
 	int numFilas = Modulos.size[0], numColumnas = Modulos.size[1];
+	cout << numFilas << endl;
 	for (int i = 0; i < numFilas; ++i) {
 		for (int j = 0; j < numColumnas; ++j) {
 			if (Modulos_dibujar.at<unsigned char>(i, j) > 70) {
@@ -137,7 +138,7 @@ void main(int argc, char ** argv) {
 		}
 	}
 	cvtColor(imagen, imagen, CV_GRAY2BGR);
-	Point mejor(numFilas / 2, best_index);
+	Point mejor(best_index, numFilas / 2);
 	circle(imagen, mejor, 5, Scalar(255, 0, 0));
 	imshow("Punto de fuga", imagen);
 
