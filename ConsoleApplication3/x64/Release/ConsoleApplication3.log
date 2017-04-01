@@ -1,12 +1,16 @@
 ﻿  Contornos.cpp
-Contornos.cpp(86): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Contornos.cpp(87): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Contornos.cpp(90): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Contornos.cpp(126): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
+Contornos.cpp(153): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(154): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(157): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(177): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
+Contornos.cpp(235): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(236): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(239): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(321): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
   Generando código
-  6 of 267 functions ( 2.2%) were compiled, the rest were copied from previous compilation.
-    0 functions were new in current compilation
-    1 functions had inline decision re-evaluated but remain unchanged
+  10 of 272 functions ( 3.7%) were compiled, the rest were copied from previous compilation.
+    1 functions were new in current compilation
+    4 functions had inline decision re-evaluated but remain unchanged
   Generación de código finalizada
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.exe
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.pdb (Full PDB)
