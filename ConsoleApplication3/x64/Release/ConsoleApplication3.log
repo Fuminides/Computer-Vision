@@ -1,15 +1,15 @@
 ﻿  Contornos.cpp
-Contornos.cpp(122): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(123): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(179): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
 Contornos.cpp(180): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Contornos.cpp(181): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Contornos.cpp(184): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Contornos.cpp(210): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Contornos.cpp(266): warning C4244: 'argumento': conversión de 'double' a 'int'; posible pérdida de datos
-Contornos.cpp(381): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
+Contornos.cpp(183): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(209): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Contornos.cpp(286): warning C4244: 'argumento': conversión de 'double' a 'int'; posible pérdida de datos
+Contornos.cpp(401): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
   Generando código
   15 of 271 functions ( 5.5%) were compiled, the rest were copied from previous compilation.
-    0 functions were new in current compilation
-    1 functions had inline decision re-evaluated but remain unchanged
+    1 functions were new in current compilation
+    4 functions had inline decision re-evaluated but remain unchanged
   Generación de código finalizada
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.exe
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.pdb (Full PDB)

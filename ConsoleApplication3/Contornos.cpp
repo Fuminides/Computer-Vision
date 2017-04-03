@@ -9,7 +9,7 @@ using namespace std;
 #define TAM_CANNY 5
 #define E 2.71828182
 #define PI 3.1416
-#define SIGMA 1
+#define SIGMA 2
 
 //Structs
 struct Gradiente {
@@ -115,16 +115,15 @@ void aplicarCanny(Mat imagen, Mat grad_x, Mat grad_y, Mat abs_grad_x, Mat abs_gr
 		for (int z = TAM_CANNY; z < columnas - TAM_CANNY; z++) {
 			operatorCannyXf(grad_x, i, z, filtro_canny_x, abs_grad_x);
 			operatorCannyXf(grad_y, i, z, filtro_canny_gaussian, abs_grad_y);
-			double angX = abs_grad_x.at<double>(i, z);
-			double angY = abs_grad_y.at<double>(i, z);
+			double angX = abs_grad_x.at<double>(i, z) / normalizacion_canny;
+			double angY = abs_grad_y.at<double>(i, z) / normalizacion_canny_gaussian;
+
 			Theta.at<double>(i, z) = atan2(angY, angX);
 			Modulos.at<double>(i, z) = sqrt(angX*angX + angY*angY);
 			Modulos_dibujar.at<unsigned char>(i, z) = sqrt(angX*angX + angY*angY);
 
 		}
 	}
-	abs_grad_x = abs_grad_x / normalizacion_canny;
-	abs_grad_y = abs_grad_y / normalizacion_canny_gaussian;
 
 	Mat GX_aux = abs_grad_x / 2.0 + 128;
 	Mat GY_aux = abs_grad_y / 2.0 + 128;
@@ -221,7 +220,7 @@ bool cerca(int x, int y, int coord_x, int coord_y) {
 	return (distancia_cuadrada < UMBRAL_DISTANCIA*UMBRAL_DISTANCIA);
 }
 
-void dibujarFuga(Mat imagen) {
+void dibujarFuga(Mat imagen, char ** argv) {
 	Mat GX(imagen.size[0], imagen.size[1], CV_8U), GY(imagen.size[0], imagen.size[1], CV_8U),
 		Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U),
 		Votos(imagen.size[0], imagen.size[1], CV_8U),
@@ -243,7 +242,28 @@ void dibujarFuga(Mat imagen) {
 	double cos_min = 0.10;
 	double cos_max = 0.90;
 
-	aplicarSobelManual(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
+	if (strcmp(argv[2], "-sa") == 0) {
+		simbolo_eje_y = -1;
+		umbral_modulo = 30;
+		cos_min = 0.05;
+		cos_max = 0.95;
+		aplicarSobelManual(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
+
+	}
+	else if (strcmp(argv[2], "-s") == 0) {
+		simbolo_eje_y = -1;
+		umbral_modulo = 30;
+		cos_min = 0.05;
+		cos_max = 0.95;
+		aplicarSobelOpenCV(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
+	}
+	else if (strcmp(argv[2], "-c") == 0) {
+		umbral_modulo = 30;
+		cos_min = 0.10;
+		cos_max = 0.90;
+		aplicarCanny(imagen, grad_x, grad_y, abs_grad_x, abs_grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
+
+	}
 
 	for (int i = 0; i < numFilas; ++i) {
 		for (int j = 0; j < numColumnas; ++j) {
@@ -265,7 +285,6 @@ void dibujarFuga(Mat imagen) {
 						if (((coord_x + numColumnas / 2) >= 0) && ((coord_x + numColumnas / 2) < numColumnas)
 							&& (!cerca(x,y,coord_x, coord_y))) {
 							Votos.at<unsigned char>(i, j) = 255;
-							
 							Votaciones.at<int>(int(coord_y + numFilas / 2), int(coord_x + numColumnas / 2)) += 1;
 						}
 					}
@@ -273,10 +292,9 @@ void dibujarFuga(Mat imagen) {
 			}
 		}
 	}
-	//cout << Votaciones << endl;
 	Mat Votaciones_print;
 	Votaciones.convertTo(Votaciones_print, CV_8U);
-	imshow("Votos", Votaciones_print +128);
+	cv::imshow("Votos", Votaciones_print +128);
 
 	int max_value = 0, best_index_x = 0, best_index_y = 0;
 	for (int i = 0; i < numFilas; i++) {
@@ -301,6 +319,7 @@ void dibujarFuga(Mat imagen) {
 
 //MAIN
 void main(int argc, char ** argv) {
+
 	if (strcmp(argv[1], "-v") == 0) {
 		VideoCapture captura;
 		Mat imagen;
@@ -309,10 +328,11 @@ void main(int argc, char ** argv) {
 		while (true) {
 			captura >> imagen;
 			cvtColor(imagen, imagen, CV_BGR2GRAY);
-			dibujarFuga(imagen);
+			dibujarFuga(imagen, argv);
 			if (waitKey(10) == 27) break; //Para con la tecla escape
 		}
 	}
+
 	Mat imagen = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
 	
 	Mat GX(imagen.size[0], imagen.size[1], CV_8U), GY(imagen.size[0], imagen.size[1], CV_8U),
@@ -349,7 +369,7 @@ void main(int argc, char ** argv) {
 		aplicarSobelOpenCV(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
 	}
 	else if (strcmp(argv[2], "-c") == 0) {
-		umbral_modulo = 65;
+		umbral_modulo = 30;
 		cos_min = 0.10;
 		cos_max = 0.90;
 		aplicarCanny(imagen, grad_x, grad_y, abs_grad_x, abs_grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
@@ -379,14 +399,17 @@ void main(int argc, char ** argv) {
 					Votos.at<unsigned char>(i, j) = 255;
 
 					int eleccion = p / cos(angulo_positivo);
-					if (((eleccion + numColumnas / 2) >= 0) && ((eleccion + numColumnas / 2) < numColumnas)) puntos_votacion[eleccion + numColumnas / 2]+=1;
+					if (((eleccion + numColumnas / 2) >= 0) && ((eleccion + numColumnas / 2) < numColumnas)
+						&& (!cerca(x, y, eleccion, 0))) {
+						puntos_votacion[eleccion + numColumnas / 2] += 1;
+					}
 				}
 			}
 		}
 	}
 	cv::imshow("Votos", Votos);
-
-	int max_value = 0, best_index;
+	
+	int max_value = 0, best_index = 0;
 	for (int i = 0; i < imagen.size[1]; i++) {
 		if (puntos_votacion[i] > max_value) {
 			max_value = puntos_votacion[i];
@@ -398,9 +421,6 @@ void main(int argc, char ** argv) {
 	std::cout << "Punto de fuga: " << mejor << endl;
 	cv::drawMarker(imagen, mejor, cv::Scalar(0, 0, 255), MARKER_CROSS, 15, 1);
 	cv::imshow("Punto de fuga", imagen);
-
-
-	std::cout << numFilas / 2 << " " << best_index << endl;
 	
 	while (true)
 		if (waitKey(10) == 27) break; //Para con la tecla escape
