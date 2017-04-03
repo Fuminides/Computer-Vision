@@ -215,73 +215,77 @@ void aplicarSobelOpenCV(Mat imagen, Mat grad_x, Mat grad_y, Mat Theta, Mat Modul
 }
 
 //Apartado 3
+bool cerca(int x, int y, int coord_x, int coord_y) {
+	const double UMBRAL_DISTANCIA = 100;
+	double distancia_cuadrada = (x - coord_x)*(x - coord_x) + (y - coord_y)*(y - coord_y);
+	return (distancia_cuadrada < UMBRAL_DISTANCIA*UMBRAL_DISTANCIA);
+}
+
 void dibujarFuga(Mat imagen) {
 	Mat GX(imagen.size[0], imagen.size[1], CV_8U), GY(imagen.size[0], imagen.size[1], CV_8U),
+		Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U),
+		Votos(imagen.size[0], imagen.size[1], CV_8U),
+		Votaciones(imagen.size[0], imagen.size[1], DataType<int>::type);
+
+	Votaciones = Mat::zeros(imagen.size[0], imagen.size[1], DataType<int>::type);
+
+	Mat grad_x(imagen.size[0], imagen.size[1], CV_64F),
+		grad_y(imagen.size[0], imagen.size[1], CV_64F),
+		abs_grad_x(imagen.size[0], imagen.size[1], CV_64F),
+		abs_grad_y(imagen.size[0], imagen.size[1], CV_64F),
 		Theta(imagen.size[0], imagen.size[1], DataType<double>::type),
-		Theta_dibujar(imagen.size[0], imagen.size[1], DataType<double>::type),
-		Modulos(imagen.size[0], imagen.size[1], DataType<float>::type),
-		Votos(imagen.size[0], imagen.size[1], CV_8U);
-	vector<vector<int>> puntos_votacion(imagen.size[0], std::vector<int>(imagen.size[1], 0));
-	Mat grad_x, grad_y, Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U);
-	Mat abs_grad_x, abs_grad_y;
+		Modulos(imagen.size[0], imagen.size[1], DataType<double>::type);
+		
+	int numFilas = imagen.size[0], numColumnas = imagen.size[1];
 
-	GaussianBlur(imagen, imagen, Size(3, 3), 0, 0, BORDER_DEFAULT);
-	Sobel(imagen, grad_x, CV_32F, 1, 0, 3);
-	Sobel(imagen, grad_y, CV_32F, 0, 1, 3);
-	grad_x = grad_x / 4.0;
-	grad_y = grad_y / 4.0;
+	int simbolo_eje_y = -1;
+	double umbral_modulo = 30;
+	double cos_min = 0.05;
+	double cos_max = 0.95;
 
-	Mat GX_aux = grad_x / 2.0 + 128;
-	Mat GY_aux = grad_y / 2.0 + 128;
-
-	phase(grad_x, grad_y, Theta);
-	magnitude(grad_x, grad_y, Modulos);
-	Modulos.convertTo(Modulos_dibujar, CV_8U);
-	GX_aux.convertTo(GX, CV_8U);
-	GY_aux.convertTo(GY, CV_8U);
-	cv::imshow("Contornos GX", GX);
-	cv::imshow("Contornos GY", GY);
-	cv::imshow("Contornos Theta", Theta / PI * 128);
-	cv::imshow("Contornos Modulos", Modulos_dibujar);
-	int numFilas = Modulos.size[0], numColumnas = Modulos.size[1];
+	aplicarSobelManual(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
 
 	for (int i = 0; i < numFilas; ++i) {
 		for (int j = 0; j < numColumnas; ++j) {
-			Votos.at<unsigned char>(i,j) = 0;
-			if (Modulos.at<float>(i, j) > 40) {
-				int x = j - numColumnas / 2;
-				int y = numFilas / 2 - i;
+			Votos.at<unsigned char>(i, j) = 0;
+
+			if (Modulos.at<double>(i, j) > umbral_modulo) {
+				int x = (j - numColumnas / 2);
+				int y = simbolo_eje_y * (numFilas / 2 - i);
+
 				double angulo_positivo = Theta.at<double>(i, j);
 				if (angulo_positivo < 0) angulo_positivo += 2 * PI;
-				double p = x*cos(angulo_positivo) + y*sin(angulo_positivo);
 
-				if (abs(cos(angulo_positivo) > 0.05) && (abs(cos(angulo_positivo) < 0.95))) {
-					//cout << abs(cos(Theta.at<double>(i, j))) << endl;
-					Votos.at<unsigned char>(i, j) = 255;
-					for (int elecciones = 0; elecciones < numFilas; ++elecciones) {
-						int valor_y = elecciones - numFilas / 2;
-						int eleccion = p - valor_y*sin(Theta.at<double>(i, j)) / cos(Theta.at<double>(i, j)); //A partir de la y, despejo de la x
-						if (((eleccion + numColumnas / 2) >= 0) && ((eleccion + numColumnas / 2) < numColumnas)) {
-							//cout << "Votamos: [" << to_string(eleccion + numColumnas / 2) << ", " <<elecciones + numFilas / 2 <<"] " << puntos_votacion[eleccion + numColumnas / 2][elecciones + numFilas / 2] <<endl;
-							puntos_votacion[eleccion + numColumnas / 2][elecciones]+=1;
+				if ((abs(cos(angulo_positivo)) < cos_max) && (abs(cos(angulo_positivo)) > cos_min)) {
+					double p = x*cos(angulo_positivo) + y*sin(angulo_positivo);
+
+					for (int coord_y = -numFilas/2; coord_y < numFilas / 2; ++coord_y) {
+						double coord_x = (p - coord_y*sin(angulo_positivo)) / cos(angulo_positivo);
+						//cout << "Coord x " << coord_x << " Coord y " << coord_y << endl;
+						if (((coord_x + numColumnas / 2) >= 0) && ((coord_x + numColumnas / 2) < numColumnas)
+							&& (!cerca(x,y,coord_x, coord_y))) {
+							Votos.at<unsigned char>(i, j) = 255;
+
+							Votaciones.at<int>(coord_x + numColumnas / 2, coord_y + numFilas / 2) += 1;
 						}
 					}
 				}
 			}
 		}
 	}
-	cv::imshow("Votos", Votos);
-	int max_value = 0, best_index_x, best_index_y;
-	for (int i = 0; i < imagen.size[0]; i++) {
-		for (int z = 0; z < imagen.size[1]; z++) {
-			if (puntos_votacion[i][z] > max_value) {
-				max_value = puntos_votacion[i][z];
+	//imshow("Votos", Votos);
+	int max_value = 0, best_index_x = 0, best_index_y = 0;
+	for (int i = 0; i < numFilas; i++) {
+		for (int z = 0; z < numColumnas; z++) {
+			if (Votaciones.at<int>(i,z) > max_value) {
+				max_value = Votaciones.at<int>(i,z);
 				std::cout << max_value << "i: "<< i << ", z:" << z << endl;
 				best_index_x = i;
 				best_index_y = z;
 			}
 		}
 	}
+
 	cvtColor(imagen, imagen, CV_GRAY2BGR);
 	Point mejor(best_index_x, best_index_y);
 	cv::drawMarker(imagen, mejor, cv::Scalar(0, 0, 255), MARKER_CROSS, 15, 1);
@@ -297,8 +301,12 @@ void dibujarFuga(Mat imagen) {
 
 //MAIN
 void main(int argc, char ** argv) {
-	Mat imagen = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
+	if (argv[1] > ) {
 
+	}
+	Mat imagen = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
+	dibujarFuga(imagen);
+	exit(0);
 	Mat GX(imagen.size[0], imagen.size[1], CV_8U), GY(imagen.size[0], imagen.size[1], CV_8U),
 		Votos(imagen.size[0], imagen.size[1], CV_8U),
 		Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U);
