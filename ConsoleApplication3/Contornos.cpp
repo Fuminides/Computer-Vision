@@ -216,7 +216,7 @@ void aplicarSobelOpenCV(Mat imagen, Mat grad_x, Mat grad_y, Mat Theta, Mat Modul
 
 //Apartado 3
 bool cerca(int x, int y, int coord_x, int coord_y) {
-	const double UMBRAL_DISTANCIA = 100;
+	const double UMBRAL_DISTANCIA = 150;
 	double distancia_cuadrada = (x - coord_x)*(x - coord_x) + (y - coord_y)*(y - coord_y);
 	return (distancia_cuadrada < UMBRAL_DISTANCIA*UMBRAL_DISTANCIA);
 }
@@ -240,8 +240,8 @@ void dibujarFuga(Mat imagen) {
 
 	int simbolo_eje_y = -1;
 	double umbral_modulo = 30;
-	double cos_min = 0.05;
-	double cos_max = 0.95;
+	double cos_min = 0.10;
+	double cos_max = 0.90;
 
 	aplicarSobelManual(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
 
@@ -265,21 +265,24 @@ void dibujarFuga(Mat imagen) {
 						if (((coord_x + numColumnas / 2) >= 0) && ((coord_x + numColumnas / 2) < numColumnas)
 							&& (!cerca(x,y,coord_x, coord_y))) {
 							Votos.at<unsigned char>(i, j) = 255;
-
-							Votaciones.at<int>(coord_x + numColumnas / 2, coord_y + numFilas / 2) += 1;
+							
+							Votaciones.at<int>(int(coord_y + numFilas / 2), int(coord_x + numColumnas / 2)) += 1;
 						}
 					}
 				}
 			}
 		}
 	}
-	//imshow("Votos", Votos);
+	//cout << Votaciones << endl;
+	Mat Votaciones_print;
+	Votaciones.convertTo(Votaciones_print, CV_8U);
+	imshow("Votos", Votaciones_print +128);
+
 	int max_value = 0, best_index_x = 0, best_index_y = 0;
 	for (int i = 0; i < numFilas; i++) {
 		for (int z = 0; z < numColumnas; z++) {
 			if (Votaciones.at<int>(i,z) > max_value) {
 				max_value = Votaciones.at<int>(i,z);
-				std::cout << max_value << "i: "<< i << ", z:" << z << endl;
 				best_index_x = i;
 				best_index_y = z;
 			}
@@ -287,26 +290,31 @@ void dibujarFuga(Mat imagen) {
 	}
 
 	cvtColor(imagen, imagen, CV_GRAY2BGR);
-	Point mejor(best_index_x, best_index_y);
+	Point mejor(best_index_y, best_index_x);
 	cv::drawMarker(imagen, mejor, cv::Scalar(0, 0, 255), MARKER_CROSS, 15, 1);
 	cv::imshow("Punto de fuga", imagen);
 
 
-	std::cout << " [" << best_index_x << ", " << best_index_y << "]" << endl;
-
-	while (true)
-		if (waitKey(10) == 27) break; //Para con la tecla escape
+		
 }
 
 
 //MAIN
 void main(int argc, char ** argv) {
-	if (argv[1] > ) {
+	if (strcmp(argv[1], "-v") == 0) {
+		VideoCapture captura;
+		Mat imagen;
+		if (!captura.open(0)) exit(0);
 
+		while (true) {
+			captura >> imagen;
+			cvtColor(imagen, imagen, CV_BGR2GRAY);
+			dibujarFuga(imagen);
+			if (waitKey(10) == 27) break; //Para con la tecla escape
+		}
 	}
 	Mat imagen = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
-	dibujarFuga(imagen);
-	exit(0);
+	
 	Mat GX(imagen.size[0], imagen.size[1], CV_8U), GY(imagen.size[0], imagen.size[1], CV_8U),
 		Votos(imagen.size[0], imagen.size[1], CV_8U),
 		Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U);

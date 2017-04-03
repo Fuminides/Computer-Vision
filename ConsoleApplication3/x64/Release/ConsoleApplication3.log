@@ -4,9 +4,8 @@ Contornos.cpp(180): warning C4244: '=': conversión de 'double' a 'unsigned char
 Contornos.cpp(181): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
 Contornos.cpp(184): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
 Contornos.cpp(210): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Contornos.cpp(265): warning C4244: 'argumento': conversión de 'double' a 'int'; posible pérdida de datos
-Contornos.cpp(268): warning C4244: 'argumento': conversión de 'double' a 'int'; posible pérdida de datos
-Contornos.cpp(369): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
+Contornos.cpp(266): warning C4244: 'argumento': conversión de 'double' a 'int'; posible pérdida de datos
+Contornos.cpp(381): warning C4244: 'inicializando': conversión de 'double' a 'int'; posible pérdida de datos
   Generando código
   15 of 271 functions ( 5.5%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
