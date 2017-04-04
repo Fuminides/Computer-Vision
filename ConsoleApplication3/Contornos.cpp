@@ -30,21 +30,31 @@ int filtro_sobel_y[3][3] = {
 
 bool guarda = false;
 
-//----Funciones Canny----
+//----FUNCIONES CANNY----
 double filtro_canny_x[TAM_CANNY];
 double filtro_canny_y[TAM_CANNY];
 double filtro_canny_gaussian[TAM_CANNY];
 
 double normalizacion_canny = 0, normalizacion_canny_gaussian=0;
 
-double termino_gaussiana(double sigma, double x, double i) {
+/**
+ * Devuelve el termino de una gaussiana dado un sigma y una distancia a la media.
+ */
+double termino_gaussiana(double sigma, double x) {
 	return exp(-(x*x)/(2*sigma*sigma)) ;
 }
 
+/**
+ * Devuelve el termino de distancia a la media x de una derivada aprox de una gaussiana.
+ */
 double termino_canny(double sigma, double x) {
 	return -x / (sigma*sigma) * exp(-x*x/(2*sigma*sigma));
 }
 
+/**
+ * Si es la primera vez que se invoca en el programa, inicializa el filtro de canny
+ * con el tamanyo y el sigma dados.
+ */
 void generar_cannny(double sigma) {
 	if (!guarda) {
 		for (int i = 0; i < TAM_CANNY; i++) {
@@ -54,7 +64,7 @@ void generar_cannny(double sigma) {
 			filtro_canny_x[i] = -calculo_termino;
 			filtro_canny_y[i] = calculo_termino;
 
-			calculo_termino = termino_gaussiana(SIGMA, indice, 1);
+			calculo_termino = termino_gaussiana(SIGMA, indice);
 			if (calculo_termino > 0) normalizacion_canny_gaussian += calculo_termino;
 			filtro_canny_gaussian[i] = calculo_termino;
 			guarda = true;
@@ -63,6 +73,10 @@ void generar_cannny(double sigma) {
 	
 }
 
+/**
+ * Operadores de Canny para las matrices, según sea a lo largo del eje X o Y, y según
+ * se opere con una matriz de bytes o de doubles.
+ */
 void operatorCannyY(Mat imagen, int x, int y, double filtro[TAM_CANNY], Mat resultado) {
 	double result = 0;
 	for (int i = 0; i < TAM_CANNY; i++) {
@@ -72,7 +86,6 @@ void operatorCannyY(Mat imagen, int x, int y, double filtro[TAM_CANNY], Mat resu
 	}
 	resultado.at<double>(x, y) = result;
 }
-
 void operatorCannyX(Mat imagen, int fila, int columna, double filtro[TAM_CANNY], Mat resultado) {
 	double result = 0;
 	for (int i = 0; i < TAM_CANNY; i++) {
@@ -81,7 +94,6 @@ void operatorCannyX(Mat imagen, int fila, int columna, double filtro[TAM_CANNY],
 	}
 	resultado.at<double>(fila, columna) = result;
 }
-
 void operatorCannyYf(Mat imagen, int x, int y, double filtro[TAM_CANNY], Mat resultado) {
 	double result = 0;
 	for (int i = 0; i < TAM_CANNY; i++) {
@@ -91,7 +103,6 @@ void operatorCannyYf(Mat imagen, int x, int y, double filtro[TAM_CANNY], Mat res
 	}
 	resultado.at<double>(x, y) = result;
 }
-
 void operatorCannyXf(Mat imagen, int fila, int columna, double filtro[TAM_CANNY], Mat resultado) {
 	double result = 0;
 	for (int i = 0; i < TAM_CANNY; i++) {
@@ -101,6 +112,10 @@ void operatorCannyXf(Mat imagen, int fila, int columna, double filtro[TAM_CANNY]
 	resultado.at<double>(fila, columna) = result;
 }
 
+/**
+ * Aplica el operador de Canny a una imagen, y devuelve los gradientes horizontales y verticales en cada punto, asi como
+ * sus modulos y angulos.
+ */
 void aplicarCanny(Mat imagen, Mat grad_x, Mat grad_y, Mat abs_grad_x, Mat abs_grad_y, Mat Theta, Mat Modulos, Mat Modulos_dibujar, Mat GX, Mat GY) {
 	generar_cannny(SIGMA);
 	int filas = imagen.size[0], columnas = imagen.size[1];
@@ -136,7 +151,12 @@ void aplicarCanny(Mat imagen, Mat grad_x, Mat grad_y, Mat abs_grad_x, Mat abs_gr
 	GY_aux.convertTo(GY, CV_8U);
 }
 
-//---Funciones Sobel-----
+//---FUNCIONES SOBEL-----
+
+/**
+ * Devuelve el valor de aplicar un filtro de Sobel, bien horizontal o
+ * bien vertical, en el punto cuyas coordenadas se han facilitado.
+ */
 double aplicar_filtro_sobel(Mat imagen, int x, int y, int filtro[3][3]) {
 	double negativos, acum_positivos;
 	if (filtro[0][1] == 0) { //Filtro para x
@@ -160,6 +180,10 @@ double aplicar_filtro_sobel(Mat imagen, int x, int y, int filtro[3][3]) {
 	}
 }
 
+/**
+ * Calcula los gradientes. con angulo y modulo, de Sobel en un punto.
+ * Lo devuelve todo en un registro.
+ */
 Gradiente operatorSobel(Mat imagen, int x, int y) {
 	double Gx = aplicar_filtro_sobel(imagen, x,y,filtro_sobel_x);
 	double Gy = aplicar_filtro_sobel(imagen, x, y, filtro_sobel_y);
@@ -173,6 +197,9 @@ Gradiente operatorSobel(Mat imagen, int x, int y) {
 	return gradiente_calculado;
 }
 
+/**
+ * Aplica el operador de Sobel, aplicando directamente la mascara.
+ */
 void aplicarSobelManual(Mat imagen, Mat grad_x, Mat grad_y, Mat Theta, Mat Modulos, Mat Modulos_dibujar, Mat GX, Mat GY) {
 	GaussianBlur(imagen, imagen, Size(5, 5), 0, 0, BORDER_DEFAULT);
 	int imgX = imagen.size[0], imgY = imagen.size[1];
@@ -194,6 +221,9 @@ void aplicarSobelManual(Mat imagen, Mat grad_x, Mat grad_y, Mat Theta, Mat Modul
 	GY.convertTo(GY, CV_8U);
 }
 
+/**
+ * Aplica el operador de Sobel, utilizando la funcion de OpenCV.
+ */
 void aplicarSobelOpenCV(Mat imagen, Mat grad_x, Mat grad_y, Mat Theta, Mat Modulos, Mat Modulos_dibujar, Mat GX, Mat GY) {
 	GaussianBlur(imagen, imagen, Size(5, 5), 0, 0, BORDER_DEFAULT);
 	Sobel(imagen, grad_x, CV_64F, 1, 0, 3);
@@ -218,19 +248,25 @@ void aplicarSobelOpenCV(Mat imagen, Mat grad_x, Mat grad_y, Mat Theta, Mat Modul
 	GY_aux.convertTo(GY, CV_8U);
 }
 
-//Apartado 3
+//----APARTADO 2------
+/**
+ * Devuelve true si solo si, se considera que un punto esta cerca de otro.
+ */
 bool cerca(int x, int y, int coord_x, int coord_y) {
 	const double UMBRAL_DISTANCIA = 150;
 	double distancia_cuadrada = (x - coord_x)*(x - coord_x) + (y - coord_y)*(y - coord_y);
 	return (distancia_cuadrada < UMBRAL_DISTANCIA*UMBRAL_DISTANCIA);
 }
 
+/**
+ * Dibuja el punto de fuga en la imagen pasada por parametro, utilizando 
+ * cualquiera de los filtros dados.
+ */
 void dibujarFuga(Mat imagen, char ** argv) {
 	Mat GX(imagen.size[0], imagen.size[1], CV_8U), GY(imagen.size[0], imagen.size[1], CV_8U),
 		Votos(imagen.size[0], imagen.size[1], CV_8U),
 		Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U),
 		Votaciones(imagen.size[0], imagen.size[1], DataType<int>::type);
-
 
 	Mat grad_x(imagen.size[0], imagen.size[1], CV_64F),
 		grad_y(imagen.size[0], imagen.size[1], CV_64F),
@@ -239,13 +275,9 @@ void dibujarFuga(Mat imagen, char ** argv) {
 		Theta(imagen.size[0], imagen.size[1], DataType<double>::type),
 		Modulos(imagen.size[0], imagen.size[1], DataType<double>::type);
 
-	
-
 	Votaciones = Mat::zeros(imagen.size[0], imagen.size[1], DataType<int>::type);
-	
 		
 	int numFilas = imagen.size[0], numColumnas = imagen.size[1];
-
 	int simbolo_eje_y = 1;
 	double umbral_modulo, cos_min, cos_max;
 
@@ -255,7 +287,6 @@ void dibujarFuga(Mat imagen, char ** argv) {
 		cos_min = 0.05;
 		cos_max = 0.95;
 		aplicarSobelManual(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
-
 	}
 	else if (strcmp(argv[2], "-s") == 0) {
 		simbolo_eje_y = -1;
@@ -269,11 +300,10 @@ void dibujarFuga(Mat imagen, char ** argv) {
 		cos_min = 0.05;
 		cos_max = 0.95;
 		aplicarCanny(imagen, grad_x, grad_y, abs_grad_x, abs_grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
-
 	}
+
 	for (int i = 0; i < numFilas; ++i) {
 		for (int j = 0; j < numColumnas; ++j) {
-			Votos.at<unsigned char>(i, j) = 0;
 
 			if (Modulos.at<double>(i, j) > umbral_modulo) {
 				int x = (j - numColumnas / 2);
@@ -283,14 +313,15 @@ void dibujarFuga(Mat imagen, char ** argv) {
 				if (angulo_positivo < 0) angulo_positivo += 2 * PI;
 
 				if ((abs(cos(angulo_positivo)) < cos_max) && (abs(cos(angulo_positivo)) > cos_min)) {
-					double p = x*cos(angulo_positivo) + y*sin(angulo_positivo);
+					double p = x*cos(angulo_positivo) + y*sin(angulo_positivo); //Calculamos p
 
 					for (int coord_y = -numFilas/2; coord_y < numFilas / 2; ++coord_y) {
-						double coord_x = (p - coord_y*sin(angulo_positivo)) / cos(angulo_positivo);
+						//Usamos p para despejar la ecuacion
+						double coord_x = (p - coord_y*sin(angulo_positivo)) / cos(angulo_positivo); 
 
+						//Filtramos puntos fuera de imagen y rectas verticales/horizontales
 						if (((coord_x + numColumnas / 2) >= 0) && ((coord_x + numColumnas / 2) < numColumnas)
 							&& (!cerca(x,y,coord_x, coord_y))) {
-							Votos.at<unsigned char>(i, j) = 255;
 							Votaciones.at<int>(int(coord_y + numFilas / 2), int(coord_x + numColumnas / 2)) += 1;
 						}
 					}
@@ -302,8 +333,8 @@ void dibujarFuga(Mat imagen, char ** argv) {
 	Mat Votaciones_print;
 	Votaciones.convertTo(Votaciones_print, CV_8U);
 	cv::imshow("Votos", Votaciones_print +128);
-	imshow("Modul", Votos);
 
+	//Busca el punto mas votado
 	int max_value = 0, best_index_x = 0, best_index_y = 0;
 	for (int i = 0; i < numFilas; i++) {
 		for (int z = 0; z < numColumnas; z++) {
@@ -339,6 +370,7 @@ void main(int argc, char ** argv) {
 			dibujarFuga(imagen, argv);
 			if (waitKey(10) == 27) break; //Para con la tecla escape
 		}
+		exit(0);
 	}
 
 	Mat imagen = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
