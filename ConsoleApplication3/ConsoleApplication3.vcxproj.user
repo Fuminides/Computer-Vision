@@ -5,7 +5,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>-v -sa C:\Users\javi-\Documents\imagenesT3\Pasillo2.pgm -c</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>C:\Users\javi-\Documents\imagenesT3\Pasillo2.pgm -sa</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

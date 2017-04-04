@@ -17,16 +17,18 @@ struct Gradiente {
 } gradiente;
 
 //Variables
-int filtro_sobel_y[3][3] = {
+int filtro_sobel_x[3][3] = {
 	-1,0,1,
 	-2,0,2,
 	-1,0,1
 };
-int filtro_sobel_x[3][3] = {
+int filtro_sobel_y[3][3] = {
 	-1,-2,-1,
 	0,0,0,
 	1,2,1
 };
+
+bool guarda = false;
 
 //----Funciones Canny----
 double filtro_canny_x[TAM_CANNY];
@@ -44,17 +46,19 @@ double termino_canny(double sigma, double x) {
 }
 
 void generar_cannny(double sigma) {
-	for (int i = 0; i < TAM_CANNY; i++) {
-		int indice = i - TAM_CANNY / 2;
-		double calculo_termino = termino_canny(SIGMA, indice);
-		if (calculo_termino > 0) normalizacion_canny += calculo_termino;
-		filtro_canny_x[i] = -calculo_termino;
-		filtro_canny_y[i] = calculo_termino;
-		
-		calculo_termino = termino_gaussiana(SIGMA,indice,1);
-		if (calculo_termino > 0) normalizacion_canny_gaussian += calculo_termino;
-		filtro_canny_gaussian[i] = calculo_termino;
-		
+	if (!guarda) {
+		for (int i = 0; i < TAM_CANNY; i++) {
+			int indice = i - TAM_CANNY / 2;
+			double calculo_termino = termino_canny(SIGMA, indice);
+			if (calculo_termino > 0) normalizacion_canny += calculo_termino;
+			filtro_canny_x[i] = -calculo_termino;
+			filtro_canny_y[i] = calculo_termino;
+
+			calculo_termino = termino_gaussiana(SIGMA, indice, 1);
+			if (calculo_termino > 0) normalizacion_canny_gaussian += calculo_termino;
+			filtro_canny_gaussian[i] = calculo_termino;
+			guarda = true;
+		}
 	}
 	
 }
@@ -137,20 +141,20 @@ double aplicar_filtro_sobel(Mat imagen, int x, int y, int filtro[3][3]) {
 	double negativos, acum_positivos;
 	if (filtro[0][1] == 0) { //Filtro para x
 		negativos = filtro[0][0] * imagen.at<unsigned char>(x - 1, y - 1) +
-			filtro[1][0] * imagen.at<unsigned char>(x - 1, y) +
-			filtro[2][0] * imagen.at<unsigned char>(x - 1, y + 1);
-		acum_positivos = filtro[0][2] * imagen.at<unsigned char>(x + 1, y - 1) +
-			filtro[1][2] * imagen.at<unsigned char>(x + 1, y) +
+			filtro[1][0] * imagen.at<unsigned char>(x , y - 1) +
+			filtro[2][0] * imagen.at<unsigned char>(x + 1, y - 1);
+		acum_positivos = filtro[0][2] * imagen.at<unsigned char>(x - 1, y + 1) +
+			filtro[1][2] * imagen.at<unsigned char>(x , y + 1) +
 			filtro[2][2] * imagen.at<unsigned char>(x + 1, y + 1);
 
 		return (negativos + acum_positivos) / 4.0;
 	}
 	else { //Filtro para y
 		acum_positivos = filtro[0][0] * imagen.at<unsigned char>(x - 1, y - 1) +
-			filtro[0][1] * imagen.at<unsigned char>(x , y - 1) +
-			filtro[0][2] * imagen.at<unsigned char>(x + 1, y - 1);
-		negativos = filtro[2][0] * imagen.at<unsigned char>(x - 1, y + 1) +
-			filtro[2][1] * imagen.at<unsigned char>(x, y + 1) +
+			filtro[0][1] * imagen.at<unsigned char>(x - 1 , y ) +
+			filtro[0][2] * imagen.at<unsigned char>(x - 1, y + 1);
+		negativos = filtro[2][0] * imagen.at<unsigned char>(x + 1, y - 1) +
+			filtro[2][1] * imagen.at<unsigned char>(x + 1, y ) +
 			filtro[2][2] * imagen.at<unsigned char>(x + 1, y + 1);
 		return (negativos + acum_positivos) / 4.0;
 	}
@@ -159,6 +163,7 @@ double aplicar_filtro_sobel(Mat imagen, int x, int y, int filtro[3][3]) {
 Gradiente operatorSobel(Mat imagen, int x, int y) {
 	double Gx = aplicar_filtro_sobel(imagen, x,y,filtro_sobel_x);
 	double Gy = aplicar_filtro_sobel(imagen, x, y, filtro_sobel_y);
+	
 	Gradiente gradiente_calculado;
 	gradiente_calculado.x = Gx;
 	gradiente_calculado.y = Gy;
@@ -222,11 +227,10 @@ bool cerca(int x, int y, int coord_x, int coord_y) {
 
 void dibujarFuga(Mat imagen, char ** argv) {
 	Mat GX(imagen.size[0], imagen.size[1], CV_8U), GY(imagen.size[0], imagen.size[1], CV_8U),
-		Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U),
 		Votos(imagen.size[0], imagen.size[1], CV_8U),
+		Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U),
 		Votaciones(imagen.size[0], imagen.size[1], DataType<int>::type);
 
-	Votaciones = Mat::zeros(imagen.size[0], imagen.size[1], DataType<int>::type);
 
 	Mat grad_x(imagen.size[0], imagen.size[1], CV_64F),
 		grad_y(imagen.size[0], imagen.size[1], CV_64F),
@@ -234,13 +238,16 @@ void dibujarFuga(Mat imagen, char ** argv) {
 		abs_grad_y(imagen.size[0], imagen.size[1], CV_64F),
 		Theta(imagen.size[0], imagen.size[1], DataType<double>::type),
 		Modulos(imagen.size[0], imagen.size[1], DataType<double>::type);
+
+	
+
+	Votaciones = Mat::zeros(imagen.size[0], imagen.size[1], DataType<int>::type);
+	
 		
 	int numFilas = imagen.size[0], numColumnas = imagen.size[1];
 
-	int simbolo_eje_y = -1;
-	double umbral_modulo = 30;
-	double cos_min = 0.10;
-	double cos_max = 0.90;
+	int simbolo_eje_y = 1;
+	double umbral_modulo, cos_min, cos_max;
 
 	if (strcmp(argv[2], "-sa") == 0) {
 		simbolo_eje_y = -1;
@@ -258,13 +265,12 @@ void dibujarFuga(Mat imagen, char ** argv) {
 		aplicarSobelOpenCV(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
 	}
 	else if (strcmp(argv[2], "-c") == 0) {
-		umbral_modulo = 30;
-		cos_min = 0.10;
-		cos_max = 0.90;
+		umbral_modulo = 40;
+		cos_min = 0.05;
+		cos_max = 0.95;
 		aplicarCanny(imagen, grad_x, grad_y, abs_grad_x, abs_grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
 
 	}
-
 	for (int i = 0; i < numFilas; ++i) {
 		for (int j = 0; j < numColumnas; ++j) {
 			Votos.at<unsigned char>(i, j) = 0;
@@ -281,7 +287,7 @@ void dibujarFuga(Mat imagen, char ** argv) {
 
 					for (int coord_y = -numFilas/2; coord_y < numFilas / 2; ++coord_y) {
 						double coord_x = (p - coord_y*sin(angulo_positivo)) / cos(angulo_positivo);
-						//cout << "Coord x " << coord_x << " Coord y " << coord_y << endl;
+
 						if (((coord_x + numColumnas / 2) >= 0) && ((coord_x + numColumnas / 2) < numColumnas)
 							&& (!cerca(x,y,coord_x, coord_y))) {
 							Votos.at<unsigned char>(i, j) = 255;
@@ -292,9 +298,11 @@ void dibujarFuga(Mat imagen, char ** argv) {
 			}
 		}
 	}
+
 	Mat Votaciones_print;
 	Votaciones.convertTo(Votaciones_print, CV_8U);
 	cv::imshow("Votos", Votaciones_print +128);
+	imshow("Modul", Votos);
 
 	int max_value = 0, best_index_x = 0, best_index_y = 0;
 	for (int i = 0; i < numFilas; i++) {
@@ -356,8 +364,8 @@ void main(int argc, char ** argv) {
 	if (strcmp(argv[2], "-sa") == 0) {
 		simbolo_eje_y = -1;
 		umbral_modulo = 30;
-		cos_min = 0.05;
-		cos_max = 0.95;
+		cos_min = 0.10;
+		cos_max = 0.90;
 		aplicarSobelManual(imagen, grad_x, grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
 		
 	}
