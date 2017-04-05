@@ -377,6 +377,7 @@ void main(int argc, char ** argv) {
 	
 	Mat GX(imagen.size[0], imagen.size[1], CV_8U), GY(imagen.size[0], imagen.size[1], CV_8U),
 		Votos(imagen.size[0], imagen.size[1], CV_8U),
+		Theta_dibujar(imagen.size[0], imagen.size[1], DataType<unsigned char>::type),
 		Modulos_dibujar(imagen.size[0], imagen.size[1], CV_8U);
 
 	Mat grad_x(imagen.size[0], imagen.size[1], CV_64F), 
@@ -415,10 +416,21 @@ void main(int argc, char ** argv) {
 		aplicarCanny(imagen, grad_x, grad_y, abs_grad_x, abs_grad_y, Theta, Modulos, Modulos_dibujar, GX, GY);
 
 	}
-	
+	for (int i = 0; i < Theta.size[0]; i++) {
+		for (int z = 0; z < Theta.size[1]; z++) {
+			if (Theta.at<double>(i, z) < 0) {
+				Theta.at<double>(i, z) += 2 * PI;
+			}
+		}
+	}
+	for (int i = 0; i < imagen.size[0]; i++) {
+		for (int j = 0; j < imagen.size[0]; j++) {
+			Theta_dibujar.at<unsigned char>(i,j) = Theta.at<double>(i,j) / PI * 127;
+		}
+	}
 	cv::imshow("Contornos GX", GX);
 	cv::imshow("Contornos GY", GY);
-	cv::imshow("Contornos Theta", Theta/PI *128 );
+	cv::imshow("Contornos Theta", Theta_dibujar );
 	cv::imshow("Contornos Modulos", Modulos_dibujar);
 
 	int numFilas = Modulos.size[0], numColumnas = Modulos.size[1];
