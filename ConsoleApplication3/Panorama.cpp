@@ -12,9 +12,9 @@ using namespace std;
 #define USE_ORB 1
 #define USE_FAST 2
 
-#define USE_BRUTE 0
-#define USE_VECINO 1
-#define USE_FLANN 2
+#define USE_BRUTE 3
+#define USE_VECINO 4
+#define USE_FLANN 5
 
 vector<KeyPoint> compute_keypoints(Mat imagen, int mode) {
 	Ptr<FeatureDetector> detector;
@@ -51,13 +51,17 @@ Mat extraer_descriptores(Mat imagen, vector<KeyPoint> keypoints, int mode) {
 }
 
 vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
-	vector<DMatch> matches;
-	if (mode == USE_BRUTE){
-		Ptr<BFMatcher> matcher = BFMatcher::create();
-		matcher->match(descriptors1, descriptors2, matches);
+	vector<DMatch> matches, good_matches;
+	vector<vector<DMatch>> matches_vecinos;
+	Ptr<BFMatcher> matcherBF;
+	double distancia_minima = INFINITY;
+	int num_matches;
 
-		std::vector< DMatch > good_matches;
-		double distancia_minima = INFINITY;
+	switch(mode){
+	case USE_BRUTE:
+		matcherBF = BFMatcher::create(NORM_HAMMING,true);
+		matcherBF->match(descriptors1, descriptors2, matches);
+
 		for (int i = 0; i < descriptors1.rows; i++)
 		{
 			if (matches[i].distance < distancia_minima)
@@ -65,38 +69,31 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 				distancia_minima = matches[i].distance;
 			}
 		}
-		for (int i = 0; i < descriptors1.rows; i++)
+		num_matches = matches.size();
+		for (int i = 0; i < num_matches; i++)
 		{
-			if ((matches[i].distance <= 3 * distancia_minima) | (matches[i].distance <= 100))
+			if (matches[i].distance <= max(3 * distancia_minima, 35.0))
 			{
 				good_matches.push_back(matches[i]);
 			}
 		}
 		matches = good_matches;
-	}
-	else if (mode == USE_ORB) {
-		for (int i = 0; i < descriptors1.size[0]; i++) {
-			double mejor_distancia = INFINITY, segunda_mejor = INFINITY;
-			int posX, posY;
-			for (int z = 0; z < descriptors2.size[0]; z++) {
-				Mat distancias_cuadradas = (descriptors1.row(i) - descriptors2.row(z)).mul(descriptors1.row(i) - descriptors2.row(z));
-				double distancia = sum(distancias_cuadradas)[0];
-				if (distancia < mejor_distancia) {
-					mejor_distancia = distancia;
-					posX = i;
-					posY = z;
-				}
-				else if (distancia < segunda_mejor) {
-					segunda_mejor = distancia;
-				}
-			}
-			if (mejor_distancia < 0.8*segunda_mejor) {
-				DMatch match(posY, posX,0,mejor_distancia);
-				matches.push_back(match);
+		break;
+	case USE_VECINO:
+		matcherBF = BFMatcher::create(NORM_HAMMING, false);
+		matcherBF->knnMatch(descriptors1, descriptors2, matches_vecinos,2);
+
+		num_matches = matches_vecinos.size();
+		for (int i = 0; i < num_matches; i++)
+		{
+			if (matches_vecinos[i][0].distance <= 0.5*matches_vecinos[i][1].distance)
+			{
+				good_matches.push_back(matches_vecinos[i][0]);
 			}
 		}
-	}
-	else if (mode == USE_FAST) {
+		matches = good_matches;
+		break;
+	case(USE_FLANN):
 		if (descriptors1.type() != CV_32F) {
 			descriptors1.convertTo(descriptors1, CV_32F);
 		}
@@ -104,25 +101,18 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 			descriptors2.convertTo(descriptors2, CV_32F);
 		}
 		Ptr<FlannBasedMatcher> matcher = FlannBasedMatcher::create();
-		matcher->match(descriptors1, descriptors2, matches);
+		matcher->knnMatch(descriptors1, descriptors2, matches_vecinos,2);
 
-		std::vector< DMatch > good_matches;
-		double distancia_minima = INFINITY;
-		for (int i = 0; i < descriptors1.rows; i++)
+		num_matches = matches_vecinos.size();
+		for (int i = 0; i < num_matches; i++)
 		{
-			if (matches[i].distance < distancia_minima)
+			if (matches_vecinos[i][0].distance <= 0.5*matches_vecinos[i][1].distance)
 			{
-				distancia_minima = matches[i].distance;
-			}
-		}
-		for (int i = 0; i < descriptors1.rows; i++)
-		{
-			if (matches[i].distance <= 3 * distancia_minima)
-			{
-				good_matches.push_back(matches[i]);
+				good_matches.push_back(matches_vecinos[i][0]);
 			}
 		}
 		matches = good_matches;
+		break;
 	}
 
 	for(int i = 0; i < matches.size(); i++) cout << matches[i].distance << " " << matches[i].imgIdx << " " << matches[i].queryIdx << " " << matches[i].trainIdx << endl;
@@ -130,26 +120,56 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 }
 
 
-void matching_disco(int argc, char ** argv) {
+void matching_disco(int argc, char ** argv, bool full=false) {
 	Mat imagen1 = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
 	Mat imagen2 = imread(argv[2], CV_LOAD_IMAGE_GRAYSCALE);
 	vector<KeyPoint> k1, k2;
+	vector<Point2f> puntos1, puntos2;
+	vector<DMatch> matches, inliers;
+	Mat mask, homografia, descriptores1, descriptores2, composicion, inliers_figure;
 
 	k1 = compute_keypoints(imagen1, USE_BRISK);
 	k2 = compute_keypoints(imagen2, USE_BRISK);
-	Mat descriptores1 = extraer_descriptores(imagen1, k1, USE_BRISK);
-	Mat descriptores2 = extraer_descriptores(imagen2, k2, USE_BRISK);
+	descriptores1 = extraer_descriptores(imagen1, k1, USE_BRISK);
+	descriptores2 = extraer_descriptores(imagen2, k2, USE_BRISK);
 
-	vector<DMatch> matches = match_descriptors(descriptores1, descriptores2, USE_BRUTE);
+	matches = match_descriptors(descriptores1, descriptores2, USE_BRUTE);
 
-	namedWindow("matches", 1);
-	Mat img_matches;
-	drawMatches(imagen1, k1, imagen2, k2, matches, img_matches);
-	imshow("matches", img_matches);
-	waitKey(0);
+	if (full) {
+		int num_matches = matches.size();
+		for (int i = 0; i < num_matches; i++) {
+			puntos1.push_back(k1[matches[i].queryIdx].pt);
+			puntos2.push_back(k2[matches[i].trainIdx].pt);
+		}
+
+		homografia = findHomography(puntos1, puntos2, mask, CV_RANSAC);
+		for (int i = 0; i < num_matches; i++) {
+			if (mask.at<unsigned char>(i)) {
+				inliers.push_back(matches[i]);
+			}
+		}
+		namedWindow("inliers", 1);
+		drawMatches(imagen1, k1, imagen2, k2, inliers, inliers_figure);
+		imshow("inliers", inliers_figure);
+		cout << imagen2.size() << endl;
+		warpPerspective(imagen1, composicion, homografia, imagen2.size());
+		namedWindow("Homografia", 2);
+		imshow("Homografia", composicion);
+		waitKey(0);
+
+	}
+	else {
+		namedWindow("matches", 1);
+		Mat img_matches;
+		drawMatches(imagen1, k1, imagen2, k2, matches, img_matches);
+		imshow("matches", img_matches);
+		waitKey(0);
+	}
+	
+
 
 }
 
 void main(int argc, char ** argv) {
-	matching_disco(argc, argv);
+	matching_disco(argc, argv, true);
 }
