@@ -119,10 +119,52 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 	return matches;
 }
 
+Mat juntarImagenes(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, vector<KeyPoint> k2, Mat descriptores2, int modo = USE_BRISK) {
+	vector<KeyPoint> k1;
+	vector<DMatch> matches;
+	Mat descriptores1;
+
+	k1 = compute_keypoints(nueva, modo);
+	descriptores1 = extraer_descriptores(nueva, k1, modo);
+	//La 1 se convierte en la 2
+	int y_stitch = 0, y_final = 0;
+	
+
+	matches = match_descriptors(descriptores2, descriptores1, USE_VECINO);
+	int matchers_size = matches.size();
+
+	for (int i = 0; i < matchers_size; i++) {
+		Point2f good_match = k2[matches[i].queryIdx].pt;
+		if (good_match.y > y_final) {
+			y_final = good_match.y;
+			y_stitch = k1[matches[i].trainIdx].pt.y;
+
+		}
+	}
+	cout << "y_final" << y_final << " y empalme " << y_stitch << endl;
+
+	Mat imagenFinal(referencia.rows, y_final + nueva.cols - y_stitch, DataType<unsigned char>::type);
+	for (int i = 0; i < imagenFinal.rows; ++i) {
+		for (int j = 0; j < imagenFinal.cols; ++j) {
+			if (j > y_final) {
+				imagenFinal.at<unsigned char>(i, j) = nueva.at<unsigned char>(i, j - y_final + y_stitch);
+			}
+			else {
+				imagenFinal.at<unsigned char>(i, j) = referencia.at<unsigned char>(i, j);
+			}
+		}
+	}
+	namedWindow("Panoramix", 4);
+	imshow("Panoramix", imagenFinal);
+
+	waitKey(0);
+
+	return imagenFinal;
+}
 
 void matching_disco(int argc, char ** argv, bool full=false) {
-	Mat imagen1 = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
-	Mat imagen2 = imread(argv[2], CV_LOAD_IMAGE_GRAYSCALE);
+	Mat imagen1 = imread(argv[2], CV_LOAD_IMAGE_GRAYSCALE);
+	Mat imagen2 = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
 	vector<KeyPoint> k1, k2;
 	vector<Point2f> puntos1, puntos2;
 	vector<DMatch> matches, inliers;
@@ -152,46 +194,11 @@ void matching_disco(int argc, char ** argv, bool full=false) {
 		drawMatches(imagen1, k1, imagen2, k2, inliers, inliers_figure);
 		imshow("inliers", inliers_figure);
 		
-		warpPerspective(imagen1, composicion, homografia, imagen1.size());
+		warpPerspective(imagen1, composicion, homografia, imagen2.size());
 		namedWindow("Homografia", 2);
 		imshow("Homografia", composicion);
 
-		//La 1 se convierte en la 2
-		int y_stitch = 0, y_final=0;
-		int inliers_size = inliers.size();
-		k1 = compute_keypoints(composicion, USE_BRISK);
-		descriptores1 = extraer_descriptores(composicion, k1, USE_BRISK);
-		matches = match_descriptors(descriptores2, descriptores1, USE_VECINO);
-
-		for (int i = 0; i < inliers_size; i++) {
-			Point2f good_match = k2[matches[i].queryIdx].pt;
-			cout << "PT: " << good_match << endl;
-			if (good_match.y > y_final) {
-				y_final = good_match.y;
-				y_stitch = k2[inliers[i].trainIdx].pt.y;
-				
-			}
-		}
-		cout << "y_final" << y_final << " y empalme " << y_stitch << endl;
-		/*namedWindow("matches finales", 6);
-		Mat matches_finales;
-		//drawMatches(imagen2, k1, composicion, k2, matches, matches_finales);
-		imshow("matches finales", matches_finales);*/
-		Mat imagenFinal(imagen1.rows,  y_final + imagen1.cols - y_stitch, DataType<unsigned char>::type);
-		for (int i = 0; i < imagenFinal.rows; ++i) {
-			for (int j = 0; j < imagenFinal.cols; ++j) {
-				if (j > y_final) {
-					imagenFinal.at<unsigned char>(i, j) = composicion.at<unsigned char>(i, j - y_final + y_stitch);
-				}
-				else {
-					imagenFinal.at<unsigned char>(i,j) = imagen2.at<unsigned char>(i, j);
-				}
-			}
-		}
-		namedWindow("Panoramix", 4);
-		imshow("Panoramix", imagenFinal);
-
-		waitKey(0);
+		juntarImagenes(imagen2, imagen2, imagen2, composicion, k2, descriptores2, USE_BRISK);
 
 	}
 	else {
