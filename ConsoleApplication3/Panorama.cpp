@@ -4,6 +4,7 @@
 #include "opencv2/opencv.hpp"
 #include "opencv2/features2d/features2d.hpp"
 #include "opencv2/highgui/highgui.hpp"
+#include <Windows.h>
 
 using namespace cv;
 using namespace std;
@@ -120,8 +121,6 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 }
 
 Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, vector<KeyPoint> k2, Mat descriptores2, int ultima_columna, int modo = USE_BRISK, int filtro = 1) {
-	
-	
 	if (filtro == 2) {
 		Mat ilum_referencia, ilum_nueva;
 		vector<Mat> channels_referencia, channels_nueva;
@@ -150,7 +149,7 @@ Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia
 	for (int i = 1; i < referencia.rows; ++i) {
 		for (int j = 1; j < ultima_columna; ++j) {
 			if (filtro == 1) {
-				if ((nueva.at<unsigned char>(i, j) != 0) && (j < referencia.cols - 1)) {
+				if ((nueva.at<unsigned char>(i, j) != 0) && (j < referencia.cols)) {
 					if (posicion < 0) {
 						double espacio = referencia.cols - j;
 						alpha = 1 / espacio;
@@ -178,15 +177,14 @@ Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia
 	}
 
 	imagenFinal_color = imagenFinal_color.colRange(0, ultima_columna);
-	cv::namedWindow("Panoramix", 7);
 	cv::imshow("Panoramix", imagenFinal_color);
 
-	cv::waitKey(0);
+	cv::waitKey(13);
 
-	return imagenFinal;
+	return imagenFinal_color;
 }
 
-void match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color, bool full = true) {
+Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color, bool full = true, int min_match = 7) {
 	vector<KeyPoint> k1, k2;
 	vector<Point2f> puntos1, puntos2;
 	vector<DMatch> matches, inliers;
@@ -199,7 +197,7 @@ void match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color
 
 	matches = match_descriptors(descriptores1, descriptores2, USE_VECINO);
 
-	if (full) {
+	if (matches.size() > min_match) {
 		int num_matches = matches.size();
 		for (int i = 0; i < num_matches; i++) {
 			puntos1.push_back(k1[matches[i].queryIdx].pt);
@@ -212,14 +210,18 @@ void match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color
 				inliers.push_back(matches[i]);
 			}
 		}
-		namedWindow("inliers", 1);
-		drawMatches(imagen1, k1, imagen2, k2, inliers, inliers_figure);
-		imshow("inliers", inliers_figure);
+		if (full) {
+			namedWindow("inliers", 1);
+			drawMatches(imagen1, k1, imagen2, k2, inliers, inliers_figure);
+			imshow("inliers", inliers_figure);
+		}
 		warpPerspective(imagen1, composicion, homografia, Size(imagen1.cols+imagen2.cols, imagen1.rows));
 		warpPerspective(imagen1_color, composicion_color, homografia, Size(imagen1.cols + imagen2.cols, imagen1.rows));
 
-		namedWindow("Homografia", 2);
-		imshow("Homografia", composicion);
+		if (full) {
+			namedWindow("Homografia", 2);
+			imshow("Homografia", composicion);
+		}
 		int suma_ultima_columna = 0;
 		vector<int> v_sumas;
 		reduce(composicion, v_sumas, 0, CV_REDUCE_SUM, -1);
@@ -230,25 +232,99 @@ void match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color
 				break;
 			}
 		}
-		juntarImagenes_derecha(imagen2_color, composicion_color, imagen2, composicion, k2, descriptores2, ultima_columna, USE_BRISK);
+		return juntarImagenes_derecha(imagen2_color, composicion_color, imagen2, composicion, k2, descriptores2, ultima_columna, USE_BRISK);
 
 	}
 	else {
-		namedWindow("matches", 1);
-		Mat img_matches;
-		drawMatches(imagen1, k1, imagen2, k2, matches, img_matches);
-		imshow("matches", img_matches);
-		waitKey(0);
+		return imagen2_color;
 	}
 
 }
 
-void matching_disco(int argc, char ** argv, bool full = false) {
+void matching_camera_boton(int numero_imagenes = 2) {
+	VideoCapture cap;
+	Mat imagen1_color, imagen1, imagen2_color, imagen2;
+	int tomadas = 0;
+	bool terminar = false;
+	namedWindow("Panoramix", 7);
+	namedWindow("Camara", 3);
+
+	if (!cap.open(0))
+		return ;
+	while (tomadas < numero_imagenes)
+	{
+		cout << "Preparado para capturar..." << endl;
+		while (!terminar) {
+			if (tomadas == 0) {
+				cap >> imagen1_color;
+				imshow("Camara", imagen1_color);
+			}
+			else {
+				cap >> imagen2_color;
+				imshow("Camara", imagen2_color);
+			}
+			terminar = waitKey(10) == 13;
+		}
+		terminar = false;
+		cout << "Imagen capturada!..." << endl;
+		if (tomadas == 0) {
+			cvtColor(imagen1_color, imagen1, CV_BGR2GRAY);
+			cv::imshow("Panoramix", imagen1_color);
+		}
+		else {
+			cvtColor(imagen2_color, imagen2, CV_BGR2GRAY);
+			imagen1_color = match_images(imagen2, imagen2_color, imagen1, imagen1_color);
+			cvtColor(imagen1_color, imagen1, CV_BGR2GRAY);
+		}
+		tomadas++;
+	}
+	
+}
+
+void matching_camera_automatico(int ciclo = 1000) {
+	VideoCapture cap;
+	Mat imagen1_color, imagen1, imagen2_color, imagen2;
+	int tomadas = 0;
+	bool terminar = false;
+	namedWindow("Panoramix", 7);
+	namedWindow("Camara", 3);
+
+	if (!cap.open(0))
+		return;
+	while (true) {
+		if (tomadas == 0) {
+			cap >> imagen1_color;
+			imshow("Camara", imagen1_color);
+		}
+		else {
+			cap >> imagen2_color;
+			imshow("Camara", imagen2_color);
+		}
+			
+		if (tomadas == 0) {
+			cvtColor(imagen1_color, imagen1, CV_BGR2GRAY);
+			cv::imshow("Panoramix", imagen1_color);
+		}
+		else {
+			cvtColor(imagen2_color, imagen2, CV_BGR2GRAY);
+			imagen1_color = match_images(imagen2, imagen2_color, imagen1, imagen1_color, false);
+			cvtColor(imagen1_color, imagen1, CV_BGR2GRAY);
+		}
+		tomadas++;
+		Sleep(ciclo);
+	}
+
+}
+
+void matching_disco(char ** argv, bool full = false) {
 	Mat imagen1 = imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE), imagen1_color = imread(argv[1], CV_LOAD_IMAGE_COLOR);
 	Mat imagen2 = imread(argv[2], CV_LOAD_IMAGE_GRAYSCALE), imagen2_color = imread(argv[2], CV_LOAD_IMAGE_COLOR);
 
 	match_images(imagen1, imagen1_color, imagen2, imagen2_color);
 }
+
 void main(int argc, char ** argv) {
-	matching_disco(argc, argv, true);
+	matching_camera_automatico(1);
+
+	waitKey(0);
 }
