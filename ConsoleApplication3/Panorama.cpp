@@ -17,6 +17,8 @@ using namespace std;
 #define USE_VECINO 4
 #define USE_FLANN 5
 
+#define OFFSET 50
+
 vector<KeyPoint> compute_keypoints(Mat imagen, int mode) {
 	Ptr<FeatureDetector> detector;
 	switch (mode) {
@@ -155,7 +157,6 @@ Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia
 						alpha = 1 / espacio;
 						posicion = j;
 					}
-					imagenFinal.at<unsigned char>(i, j) = referencia.at<unsigned char>(i, j);
 					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j)*(alpha*abs(j - posicion)) + referencia_color.at<Vec3b>(i, j)*(1 - (alpha*abs(j - posicion)));
 				}
 				else if (j < referencia.cols) {
@@ -184,50 +185,63 @@ Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia
 	return imagenFinal_color;
 }
 
-Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, int modo = USE_BRISK, int filtro = 1) {
+Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, int aumentoR, int aumentoR2, int modo = USE_BRISK, int filtro = 1) {
 	nueva.resize(referencia.rows);
 	nueva_color.resize(referencia.rows);
 
-	double alpha = 0.5;
-	Mat imagenFinal(referencia.rows, nueva.cols, DataType<unsigned char>::type);
-	Mat imagenFinal_color(referencia.rows, referencia.cols + nueva.cols, CV_8UC3);
+	Mat imagenFinal_color(referencia.rows, referencia.cols, CV_8UC3);
+	Mat imagenFinal(referencia.rows, referencia.cols, CV_8U);
 
-	int posicion = abs(referencia.cols-nueva.cols);
-	cout << "Tam: " << nueva_color.size() << " Ultima Columna " << ultima_columna << " Posicion " << posicion << endl;
-	for (int i = 0; i < imagenFinal.rows; ++i) {
-		for (int j = 0; j < imagenFinal.cols; ++j) {
+	int posicion = -1;
+	double espacio, alpha = 0.5;
+	for (int i = 1; i < imagenFinal_color.rows; ++i) {
+		for (int j = 0; j < imagenFinal_color.cols; ++j) {
 			if (filtro == 1) {
-				/*if ((nueva.at<unsigned char>(i, j) != 0) && (j < referencia.cols)) {
-					if (posicion < 0) {
-						double espacio = referencia.cols - j;
+				if ((nueva.at<unsigned char>(i , j) != 0) && (referencia.at<unsigned char>(i , j)!=0)) {
+					if (posicion == -1) {
+						espacio = abs(ultima_columna - j);
 						alpha = 1 / espacio;
 						posicion = j;
+						cout << "Alpha: " << alpha << " Ultima Columna " << ultima_columna << " Posicion " << posicion << endl;
+
 					}
+					imagenFinal.at<unsigned char>(i, j) = referencia.at<unsigned>(i, j) *(alpha*abs(j - posicion)) + referencia.at<unsigned>(i, j)*(1 - (alpha*abs(j - posicion)));
+					imagenFinal_color.at<Vec3b>(i-0, j+0) = nueva_color.at<Vec3b>(i , j) *(alpha*abs(j - posicion)) + referencia_color.at<Vec3b>(i, j)*(1 - (alpha*abs(j - posicion)));
+				}
+				else if (referencia.at<unsigned char>(i , j) != 0) {
 					imagenFinal.at<unsigned char>(i, j) = referencia.at<unsigned char>(i, j);
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j)*(alpha*abs(j - posicion)) + referencia_color.at<Vec3b>(i, j)*(1 - (alpha*abs(j - posicion)));
-				}
-				else*/ if (j- (imagenFinal.cols - referencia.cols) > 0) {
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j - (imagenFinal.cols - referencia.cols));
+					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i , j);
 				}
 				else {
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
+					imagenFinal.at<unsigned char>(i , j) = nueva.at<unsigned char>(i, j);
+					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i , j);
 				}
-			}
-			else if (filtro == 2) {
-				if (j < nueva.cols - 1) {
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
-				}
-				else {
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
-				}
-			}
-			else {
-				imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j) + referencia_color.at<Vec3b>(i, j)*(alpha*abs(j - posicion));
 			}
 		}
 	}
+	vector <int> v_sumas;
+	vector <int> v_rows;
 
-	//imagenFinal_color = imagenFinal_color.colRange(0, ultima_columna);
+	reduce(imagenFinal, v_sumas, 0, CV_REDUCE_SUM, -1);
+	int tam = v_sumas.size(), primer_columna_valida;
+	for (int z = 1; z < tam - 1; z++) {
+		if ((v_sumas[z] != 0) && (v_sumas[z + 1] != 0) && (v_sumas[z - 1] == 0)) {
+			primer_columna_valida = z;
+			break;
+		}
+	}
+	
+	reduce(imagenFinal, v_rows, 1, CV_REDUCE_SUM, -1);
+	tam = v_rows.size();int  primer_fila_valida;
+	for (int z = 1; z < tam - 1; z++) {
+		if ((v_sumas[z] != 0) && (v_sumas[z + 1] != 0) && (v_sumas[z - 1] == 0)) {
+			primer_fila_valida = z;
+			break;
+		}
+	}
+	imagenFinal_color = imagenFinal_color.colRange(primer_columna_valida, imagenFinal.cols);
+	imagenFinal_color = imagenFinal_color.rowRange(primer_fila_valida, imagenFinal.rows);
+
 	cv::imshow("Panoramix", imagenFinal_color);
 
 	cv::waitKey(13);
@@ -288,20 +302,30 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 			return juntarImagenes_derecha(imagen1_color, composicion_color, imagen1, composicion, ultima_columna, USE_BRISK);
 		}
 		else {
+			float coef_aum = 0.3;
+			int aumentoC1 = imagen1.cols * coef_aum, aumentoR1 = imagen1.rows * coef_aum;
+			int aumentoC2 = imagen2.cols * coef_aum, aumentoR2 = imagen2.rows * coef_aum;
 
-			Mat n_m2(imagen2.rows, imagen2.cols * 2, DataType<unsigned char>::type);
-			Mat n_m2_color(imagen2.rows, imagen2.cols * 2, CV_8UC3);
-			Mat n_m1(imagen1.rows, imagen1.cols * 2, DataType<unsigned char>::type);
-			Mat n_m1_color(imagen1.rows, imagen1.cols * 2, CV_8UC3);
+			Mat n_m2(imagen2.rows + aumentoR2, imagen2.cols + aumentoC2, DataType<unsigned char>::type);
+			Mat n_m2_color(imagen2.rows + aumentoR2, imagen2.cols + aumentoC2, CV_8UC3);
+			Mat n_m1(imagen1.rows + aumentoR1, imagen1.cols + aumentoC2, DataType<unsigned char>::type);
+			Mat n_m1_color(imagen1.rows + aumentoR1, imagen1.cols +aumentoC1, CV_8UC3);
+
 
 			for (int i = 0; i < imagen2.rows; i++) {
 				for (int j = 0; j < imagen2.cols; j++) {
-					n_m2_color.at<Vec3b>(i, j + imagen2.cols) = imagen2_color.at<Vec3b>(i, j);
-					n_m2.at<unsigned char>(i, j + imagen2.cols) = imagen2.at<unsigned char>(i, j);
-					n_m1_color.at<Vec3b>(i, j + imagen1.cols) = imagen1_color.at<Vec3b>(i, j);
-					n_m1.at<unsigned char>(i, j + imagen1.cols) = imagen1.at<unsigned char>(i, j);
+					n_m2_color.at<Vec3b>(i + aumentoR2, j + aumentoC2) = imagen2_color.at<Vec3b>(i, j);
+					n_m2.at<unsigned char>(i + aumentoR2,j + aumentoC2) = imagen2.at<unsigned char>(i, j);
+					
 				}
 			}
+			for (int i = 0; i < imagen1.rows; i++) {
+				for (int j = 0; j < imagen1.cols; j++) {
+					n_m1_color.at<Vec3b>(i + aumentoR1, j + aumentoC1) = imagen1_color.at<Vec3b>(i, j);
+					n_m1.at<unsigned char>(i + aumentoR1, j + aumentoC1) = imagen1.at<unsigned char>(i, j);
+				}
+			}
+
 			k1 = compute_keypoints(n_m1, USE_BRISK);
 			k2 = compute_keypoints(n_m2, USE_BRISK);
 			descriptores1 = extraer_descriptores(n_m1, k1, USE_BRISK);
@@ -323,11 +347,12 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 					}
 				}
 			}
-			warpPerspective(n_m2, composicion, homografia, Size(imagen2.cols * 2, imagen1.rows));
-			warpPerspective(n_m2_color, composicion_color, homografia, Size(imagen2.cols * 2, imagen1.rows));
+			warpPerspective(n_m2, composicion, homografia, Size(n_m2.cols, n_m2.rows));
+			warpPerspective(n_m2_color, composicion_color, homografia, Size(n_m2.cols, n_m2.rows));
 			if (full) {
 				namedWindow("Homografia", 2);
-				imshow("Homografia", composicion_color);
+				imshow("Homografia", composicion);
+				imshow("Img 1", n_m1);
 			}
 			reduce(composicion, v_sumas, 0, CV_REDUCE_SUM, -1);
 			 tam = v_sumas.size(), ultima_columna;
@@ -338,7 +363,7 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 				}
 			}
 			cout << "Empalmamos por la izquierda." << endl;
-			return juntarImagenes_izquierda(imagen1_color, composicion_color, imagen1, composicion, ultima_columna, USE_BRISK);
+			return juntarImagenes_izquierda(n_m1_color, composicion_color, n_m1, composicion, ultima_columna, aumentoR1,aumentoR2,USE_BRISK);
 		}
 
 	}
@@ -431,7 +456,7 @@ void matching_disco(char ** argv, bool full = false) {
 }
 
 void main(int argc, char ** argv) {
-	matching_camera_boton();
+	matching_camera_boton(5);
 
 	cv::waitKey(0);
 }
