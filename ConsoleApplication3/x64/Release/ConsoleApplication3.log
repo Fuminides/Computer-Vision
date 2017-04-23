@@ -2,12 +2,14 @@
 Panorama.cpp(73): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
 Panorama.cpp(87): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
 Panorama.cpp(107): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(201): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(228): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(252): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(279): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(312): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(334): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
   Generando código
-  10 of 633 functions ( 1.6%) were compiled, the rest were copied from previous compilation.
+  10 of 636 functions ( 1.6%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    6 functions had inline decision re-evaluated but remain unchanged
+    12 functions had inline decision re-evaluated but remain unchanged
   Generación de código finalizada
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.exe
   ConsoleApplication3.vcxproj -> C:\Users\javi-\Documents\Visual Studio 2015\Projects\ConsoleApplication3\x64\Release\ComputerVision.pdb (Full PDB)

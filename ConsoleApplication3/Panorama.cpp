@@ -120,7 +120,7 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 	return matches;
 }
 
-Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, vector<KeyPoint> k2, Mat descriptores2, int ultima_columna, int modo = USE_BRISK, int filtro = 1) {
+Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, int modo = USE_BRISK, int filtro = 1) {
 	if (filtro == 2) {
 		Mat ilum_referencia, ilum_nueva;
 		vector<Mat> channels_referencia, channels_nueva;
@@ -158,7 +158,7 @@ Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia
 					imagenFinal.at<unsigned char>(i, j) = referencia.at<unsigned char>(i, j);
 					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j)*(alpha*abs(j - posicion)) + referencia_color.at<Vec3b>(i, j)*(1 - (alpha*abs(j - posicion)));
 				}
-				else if (j < referencia.cols - 1) {
+				else if (j < referencia.cols) {
 					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
 				}
 				else {
@@ -166,7 +166,7 @@ Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia
 				}
 			}
 			else if (filtro == 2) {
-				if (j < referencia.cols - 1) {
+				if (j < referencia.cols ) {
 					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
 				}
 				else {
@@ -184,12 +184,63 @@ Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia
 	return imagenFinal_color;
 }
 
+Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, int modo = USE_BRISK, int filtro = 1) {
+	nueva.resize(referencia.rows);
+	nueva_color.resize(referencia.rows);
+
+	double alpha = 0.5;
+	Mat imagenFinal(referencia.rows, nueva.cols, DataType<unsigned char>::type);
+	Mat imagenFinal_color(referencia.rows, referencia.cols + nueva.cols, CV_8UC3);
+
+	int posicion = abs(referencia.cols-nueva.cols);
+	cout << "Tam: " << nueva_color.size() << " Ultima Columna " << ultima_columna << " Posicion " << posicion << endl;
+	for (int i = 0; i < imagenFinal.rows; ++i) {
+		for (int j = 0; j < imagenFinal.cols; ++j) {
+			if (filtro == 1) {
+				/*if ((nueva.at<unsigned char>(i, j) != 0) && (j < referencia.cols)) {
+					if (posicion < 0) {
+						double espacio = referencia.cols - j;
+						alpha = 1 / espacio;
+						posicion = j;
+					}
+					imagenFinal.at<unsigned char>(i, j) = referencia.at<unsigned char>(i, j);
+					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j)*(alpha*abs(j - posicion)) + referencia_color.at<Vec3b>(i, j)*(1 - (alpha*abs(j - posicion)));
+				}
+				else*/ if (j- (imagenFinal.cols - referencia.cols) > 0) {
+					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j - (imagenFinal.cols - referencia.cols));
+				}
+				else {
+					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
+				}
+			}
+			else if (filtro == 2) {
+				if (j < nueva.cols - 1) {
+					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
+				}
+				else {
+					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
+				}
+			}
+			else {
+				imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j) + referencia_color.at<Vec3b>(i, j)*(alpha*abs(j - posicion));
+			}
+		}
+	}
+
+	//imagenFinal_color = imagenFinal_color.colRange(0, ultima_columna);
+	cv::imshow("Panoramix", imagenFinal_color);
+
+	cv::waitKey(13);
+
+	return imagenFinal_color;
+}
+
 Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color, bool full = true, int min_match = 7) {
 	vector<KeyPoint> k1, k2;
 	vector<Point2f> puntos1, puntos2;
 	vector<DMatch> matches, inliers;
 	Mat mask, homografia, descriptores1, descriptores2, composicion, composicion_color, inliers_figure;
-
+	
 	k1 = compute_keypoints(imagen1, USE_BRISK);
 	k2 = compute_keypoints(imagen2, USE_BRISK);
 	descriptores1 = extraer_descriptores(imagen1, k1, USE_BRISK);
@@ -204,7 +255,7 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 			puntos2.push_back(k2[matches[i].trainIdx].pt);
 		}
 
-		homografia = findHomography(puntos1, puntos2, mask, CV_RANSAC);
+		homografia = findHomography(puntos2, puntos1, mask, CV_RANSAC);
 		for (int i = 0; i < num_matches; i++) {
 			if (mask.at<unsigned char>(i)) {
 				inliers.push_back(matches[i]);
@@ -215,8 +266,8 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 			drawMatches(imagen1, k1, imagen2, k2, inliers, inliers_figure);
 			imshow("inliers", inliers_figure);
 		}
-		warpPerspective(imagen1, composicion, homografia, Size(imagen1.cols+imagen2.cols, imagen1.rows));
-		warpPerspective(imagen1_color, composicion_color, homografia, Size(imagen1.cols + imagen2.cols, imagen1.rows));
+		warpPerspective(imagen2, composicion, homografia, Size(imagen1.cols+imagen2.cols, imagen1.rows));
+		warpPerspective(imagen2_color, composicion_color, homografia, Size(imagen1.cols + imagen2.cols, imagen1.rows));
 
 		if (full) {
 			namedWindow("Homografia", 2);
@@ -226,13 +277,69 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 		vector<int> v_sumas;
 		reduce(composicion, v_sumas, 0, CV_REDUCE_SUM, -1);
 		int tam = v_sumas.size(), ultima_columna;
-		for (int z = 1; z < tam-1; z++) {
-			if ((v_sumas[z] == 0) && (v_sumas[z+1] == 0) && (v_sumas[z-1] != 0)) {
+		for (int z = 1; z < tam - 1; z++) {
+			if ((v_sumas[z] == 0) && (v_sumas[z + 1] == 0) && (v_sumas[z - 1] != 0)) {
 				ultima_columna = z - 1;
 				break;
 			}
 		}
-		return juntarImagenes_derecha(imagen2_color, composicion_color, imagen2, composicion, k2, descriptores2, ultima_columna, USE_BRISK);
+		if (v_sumas[0] == 0) {
+			cout << "Empalmamos por la derecha." << endl;
+			return juntarImagenes_derecha(imagen1_color, composicion_color, imagen1, composicion, ultima_columna, USE_BRISK);
+		}
+		else {
+
+			Mat n_m2(imagen2.rows, imagen2.cols * 2, DataType<unsigned char>::type);
+			Mat n_m2_color(imagen2.rows, imagen2.cols * 2, CV_8UC3);
+			Mat n_m1(imagen1.rows, imagen1.cols * 2, DataType<unsigned char>::type);
+			Mat n_m1_color(imagen1.rows, imagen1.cols * 2, CV_8UC3);
+
+			for (int i = 0; i < imagen2.rows; i++) {
+				for (int j = 0; j < imagen2.cols; j++) {
+					n_m2_color.at<Vec3b>(i, j + imagen2.cols) = imagen2_color.at<Vec3b>(i, j);
+					n_m2.at<unsigned char>(i, j + imagen2.cols) = imagen2.at<unsigned char>(i, j);
+					n_m1_color.at<Vec3b>(i, j + imagen1.cols) = imagen1_color.at<Vec3b>(i, j);
+					n_m1.at<unsigned char>(i, j + imagen1.cols) = imagen1.at<unsigned char>(i, j);
+				}
+			}
+			k1 = compute_keypoints(n_m1, USE_BRISK);
+			k2 = compute_keypoints(n_m2, USE_BRISK);
+			descriptores1 = extraer_descriptores(n_m1, k1, USE_BRISK);
+			descriptores2 = extraer_descriptores(n_m2, k2, USE_BRISK);
+			
+			matches = match_descriptors(descriptores1, descriptores2, USE_VECINO);
+
+			if (matches.size() > min_match) {
+				int num_matches = matches.size();
+				for (int i = 0; i < num_matches; i++) {
+					puntos1.push_back(k1[matches[i].queryIdx].pt);
+					puntos2.push_back(k2[matches[i].trainIdx].pt);
+				}
+
+				homografia = findHomography(puntos2, puntos1, mask, CV_RANSAC);
+				for (int i = 0; i < num_matches; i++) {
+					if (mask.at<unsigned char>(i)) {
+						inliers.push_back(matches[i]);
+					}
+				}
+			}
+			warpPerspective(n_m2, composicion, homografia, Size(imagen2.cols * 2, imagen1.rows));
+			warpPerspective(n_m2_color, composicion_color, homografia, Size(imagen2.cols * 2, imagen1.rows));
+			if (full) {
+				namedWindow("Homografia", 2);
+				imshow("Homografia", composicion_color);
+			}
+			reduce(composicion, v_sumas, 0, CV_REDUCE_SUM, -1);
+			 tam = v_sumas.size(), ultima_columna;
+			for (int z = 1; z < tam - 1; z++) {
+				if ((v_sumas[z] == 0) && (v_sumas[z + 1] == 0) && (v_sumas[z - 1] != 0)) {
+					ultima_columna = z - 1;
+					break;
+				}
+			}
+			cout << "Empalmamos por la izquierda." << endl;
+			return juntarImagenes_izquierda(imagen1_color, composicion_color, imagen1, composicion, ultima_columna, USE_BRISK);
+		}
 
 	}
 	else {
@@ -263,7 +370,7 @@ void matching_camera_boton(int numero_imagenes = 2) {
 				cap >> imagen2_color;
 				imshow("Camara", imagen2_color);
 			}
-			terminar = waitKey(10) == 13;
+			terminar = cv::waitKey(10) == 13;
 		}
 		terminar = false;
 		cout << "Imagen capturada!..." << endl;
@@ -273,7 +380,7 @@ void matching_camera_boton(int numero_imagenes = 2) {
 		}
 		else {
 			cvtColor(imagen2_color, imagen2, CV_BGR2GRAY);
-			imagen1_color = match_images(imagen2, imagen2_color, imagen1, imagen1_color);
+			imagen1_color = match_images(imagen1, imagen1_color, imagen2, imagen2_color);
 			cvtColor(imagen1_color, imagen1, CV_BGR2GRAY);
 		}
 		tomadas++;
@@ -324,7 +431,7 @@ void matching_disco(char ** argv, bool full = false) {
 }
 
 void main(int argc, char ** argv) {
-	matching_camera_automatico(1);
+	matching_camera_boton();
 
-	waitKey(0);
+	cv::waitKey(0);
 }
