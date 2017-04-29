@@ -1,19 +1,21 @@
 ﻿  Panorama.cpp
-Panorama.cpp(75): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(89): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(109): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(208): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
-Panorama.cpp(226): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(235): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(266): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(293): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(305): warning C4305: 'inicializando': truncamiento de 'double' a 'float'
-Panorama.cpp(306): warning C4244: 'inicializando': conversión de 'float' a 'int'; posible pérdida de datos
-Panorama.cpp(307): warning C4244: 'inicializando': conversión de 'float' a 'int'; posible pérdida de datos
-Panorama.cpp(337): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
-Panorama.cpp(358): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(85): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(99): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(119): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(282): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Panorama.cpp(346): warning C4244: '=': conversión de 'double' a 'unsigned char'; posible pérdida de datos
+Panorama.cpp(402): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(434): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(449): warning C4244: 'inicializando': conversión de 'float' a 'int'; posible pérdida de datos
+Panorama.cpp(450): warning C4244: 'inicializando': conversión de 'float' a 'int'; posible pérdida de datos
+Panorama.cpp(486): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(510): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(525): warning C4244: 'inicializando': conversión de 'float' a 'int'; posible pérdida de datos
+Panorama.cpp(526): warning C4244: 'inicializando': conversión de 'float' a 'int'; posible pérdida de datos
+Panorama.cpp(562): warning C4267: 'inicializando': conversión de 'size_t' a 'int'; posible pérdida de datos
+Panorama.cpp(586): warning C4267: '=': conversión de 'size_t' a 'int'; posible pérdida de datos
   Generando código
-  9 of 636 functions ( 1.4%) were compiled, the rest were copied from previous compilation.
+  15 of 647 functions ( 2.3%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     1 functions had inline decision re-evaluated but remain unchanged
   Generación de código finalizada
