@@ -219,16 +219,13 @@ Mat hom_ransac(vector<Point2f> puntos2, vector<Point2f> puntos1, Mat mask, int l
  * sea en la parte derecha de la imagen original.
  */
 Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, int filtro = 1) {
-	nueva.resize(referencia.rows);
-	nueva_color.resize(referencia.rows);
-
-	double alpha = 0.5;
-	Mat imagenFinal(referencia.rows, referencia.cols + nueva.cols, DataType<unsigned char>::type);
-	Mat imagenFinal_color(referencia.rows, referencia.cols + nueva.cols, CV_8UC3);
+	Mat imagenFinal(nueva.rows, nueva.cols, DataType<unsigned char>::type);
+	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
 	int posicion = -1;
+	double alpha = 0.5;
 
-	for (int i = 1; i < nueva.rows; ++i) {
-		for (int j = 1; j < nueva.cols; ++j) {
+	for (int i = 1; i < imagenFinal.rows; ++i) {
+		for (int j = 1; j < imagenFinal.cols; ++j) {
 			if (filtro == 1) {
 				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
 					if (posicion < 0) {
@@ -270,15 +267,15 @@ Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia
 */
 Mat juntarImagenes_abajo(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_fila, int filtro = 0) {
 	double alpha = 0.5;
-	Mat imagenFinal(nueva.rows + referencia.cols, nueva.cols + referencia.cols, DataType<unsigned char>::type);
-	Mat imagenFinal_color(nueva.rows + referencia.rows, nueva.cols + referencia.cols, CV_8UC3);
+	Mat imagenFinal(nueva.rows, nueva.cols, DataType<unsigned char>::type);
+	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
 	
 	int posicion = -1;
 
 	for (int i = 1; i < imagenFinal.rows; ++i) {
 		for (int j = 1; j < imagenFinal.cols; ++j) {
 			if (filtro == 1) {
-				if ((i < nueva.rows) && (j < nueva.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
+				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
 					if (posicion < 0) {
 						double espacio = abs(ultima_fila - i);
 						alpha = 1 / espacio;
@@ -290,7 +287,7 @@ Mat juntarImagenes_abajo(Mat referencia_color, Mat nueva_color, Mat referencia, 
 				else if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
 					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
 				}
-				else if ((i < nueva.rows) && (j < nueva.cols)){
+				else {
 					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
 				}
 			}
@@ -298,7 +295,7 @@ Mat juntarImagenes_abajo(Mat referencia_color, Mat nueva_color, Mat referencia, 
 				if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
 					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
 				}
-				else if ((i < nueva.rows) && (j < nueva.cols)) {
+				else {
 					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
 				}
 			}
@@ -318,11 +315,8 @@ Mat juntarImagenes_abajo(Mat referencia_color, Mat nueva_color, Mat referencia, 
  * sea en la parte izquierda de la imagen original.
  */
 Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, int filtro = 1) {
-	nueva.resize(referencia.rows);
-	nueva_color.resize(referencia.rows);
-
-	Mat imagenFinal_color(referencia.rows, referencia.cols, CV_8UC3);
-	Mat imagenFinal(referencia.rows, referencia.cols, CV_8U);
+	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
+	Mat imagenFinal(nueva.rows, nueva.cols, CV_8U);
 
 	int posicion = -1;
 	double espacio, alpha = 0.5;
@@ -330,7 +324,7 @@ Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referenc
 		for (int j = 1; j < imagenFinal_color.cols; ++j) {
 			if (filtro == 1) {
 				//Miramos si estamos en zona de interseccion
-				if ((nueva.at<unsigned char>(i , j) != 0) && (referencia.at<unsigned char>(i , j)!=0)) {
+				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i , j) != 0) && (referencia.at<unsigned char>(i , j)!=0)) {
 					if (posicion == -1) {
 						espacio = abs(ultima_columna - j);
 						alpha = 1 / espacio;
@@ -340,11 +334,11 @@ Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referenc
 					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i , j) *min(1,(alpha*abs(j - posicion))) + nueva_color.at<Vec3b>(i, j)*max(0,(1 - (alpha*abs(j - posicion))));
 				}
 				//Si no cogemos de la referencia
-				else if (referencia.at<unsigned char>(i, j) != 0) {
+				else if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
 					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
 				}
 				//Si no, estamos en el sitio a anyadir (comprobamos rangos de matriz)
-				else if ((i < nueva.rows) && (j < nueva.cols) && (nueva.at<unsigned char>(i, j) != 0)) {
+				else {
 					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
 				}
 			}
@@ -376,38 +370,87 @@ Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referenc
 * sea en la parte arriba de la imagen original.
 */
 Mat juntarImagenes_arriba(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_fila, int filtro = 1) {
-	Mat imagenFinal_color(referencia.rows, referencia.cols, CV_8UC3);
-	Mat imagenFinal(referencia.rows, referencia.cols, CV_8U);
+	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
+	Mat imagenFinal(nueva.rows, nueva.cols, CV_8U);
 
 	int posicion = -1;
 	double espacio, alpha = 0.5;
-	for (int i = 1; i < referencia.rows; ++i) {
-		for (int j = 1; j < referencia.cols - 1; ++j) {
+	for (int i = 1; i < imagenFinal.rows; ++i) {
+		for (int j = 1; j < imagenFinal.cols - 1; ++j) {
 			if (filtro == 1) {
 				//Miramos si estamos en zona de interseccion
-				if ((i < nueva.rows) && (j < nueva.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
+				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
 					if (posicion == -1) {
 						espacio = abs(ultima_fila - i);
 						alpha = 1 / espacio;
 						posicion = i;
-						cout << "Alpha: " << alpha << " Ultima Columna " << ultima_fila << " Posicion " << posicion << " Correcto: " << abs(ultima_fila - posicion) * alpha << endl;
 					}
 					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j) *min(1, (alpha*abs(i - posicion))) + referencia_color.at<Vec3b>(i, j)*max(0, (1 - (alpha*abs(i - posicion))));
 				}
 				//Si no cogemos de la referencia
-				else if (referencia.at<unsigned char>(i, j) != 0) {
+				else if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
 					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
 				}
 				//Si no, estamos en el sitio a anyadir (comprobamos rangos de matriz)
-				else if ((i < nueva.rows) && (j < nueva.cols) && (nueva.at<unsigned char>(i, j) != 0)) {
+				else if ((nueva.at<unsigned char>(i, j) != 0)) {
 					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
 				}
 			}
 			if (filtro == 0) {
-				if (referencia.at<unsigned char>(i, j) != 0) {
+				if ((i < referencia.rows) && (j < referencia.cols)){
 					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
 				}
-				else if ((i < nueva.rows) && (j < nueva.cols)){
+				else  {
+					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
+				}
+			}
+		}
+	}
+
+	cv::imshow("Panoramix", cropBroders(imagenFinal_color));
+
+	cv::waitKey(13);
+
+	return cropBroders(imagenFinal_color);
+}
+
+/**
+* Junta la imagen de la homografia la imagen original, siempre y cuando la union entre ambas
+* sea en la parte arriba de la imagen original.
+*/
+Mat juntarImagenes_vertical(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_fila, bool arriba, int filtro = 1) {
+	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
+	Mat imagenFinal(nueva.rows, nueva.cols, CV_8U);
+
+	int posicion = -1;
+	double espacio, alpha = 0.5;
+	for (int i = 1; i < imagenFinal.rows; ++i) {
+		for (int j = 1; j < imagenFinal.cols - 1; ++j) {
+			if (filtro == 1) {
+				//Miramos si estamos en zona de interseccion
+				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
+					if (posicion == -1) {
+						espacio = abs(ultima_fila - i);
+						alpha = 1 / espacio;
+						posicion = i;
+					}
+					if (arriba) imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j) *min(1, (alpha*abs(i - posicion))) + referencia_color.at<Vec3b>(i, j)*max(0, (1 - (alpha*abs(i - posicion))));
+					else imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j) *min(1, (alpha*abs(i - posicion))) + nueva_color.at<Vec3b>(i, j)*max(0, (1 - (alpha*abs(i - posicion))));
+				}
+				//Si no cogemos de la referencia
+				else if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
+					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
+				}
+				//Si no, estamos en el sitio a anyadir (comprobamos rangos de matriz)
+				else if ((nueva.at<unsigned char>(i, j) != 0)) {
+					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
+				}
+			}
+			if (filtro == 0) {
+				if ((i < referencia.rows) && (j < referencia.cols)) {
+					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
+				}
+				else {
 					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
 				}
 			}
@@ -451,17 +494,15 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 		}
 
 		if (full) {
-			namedWindow("inliers", 1);
 			drawMatches(imagen1, k1, imagen2, k2, matches, inliers_figure);
-			imshow("inliers primeros", inliers_figure);
+			imshow("inliers", inliers_figure);
 		}
 
 		warpPerspective(imagen2, composicion, homografia, Size(imagen1.cols+imagen2.cols, imagen1.rows));
 		warpPerspective(imagen2_color, composicion_color, homografia, Size(imagen1.cols + imagen2.cols, imagen1.rows));
 
 		if (full) {
-			namedWindow("Homografia primer", 2);
-			imshow("Homografia primer", composicion);
+			imshow("Homografia primera", composicion);
 		}
 		Mat traspose;
 		int suma_ultima_columna = 0;
@@ -571,7 +612,7 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 					}
 				}
 				cout << "Empalmamos por arriba. " << ultima_fila << endl;
-				return juntarImagenes_arriba(n_m1_color, composicion_color, n_m1, composicion, ultima_fila, filtro);
+				return juntarImagenes_vertical(n_m1_color, composicion_color, n_m1, composicion, ultima_fila, true, filtro);
 			}
 			else {
 				transpose(composicion, traspose);
@@ -584,7 +625,7 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 					}
 				}
 				cout << "Empalmamos por abajo." << endl;
-				return juntarImagenes_abajo(n_m1_color, composicion_color, n_m1, composicion, ultima_fila,filtro);
+				return juntarImagenes_vertical(n_m1_color, composicion_color, n_m1, composicion, ultima_fila, false, filtro);
 			}
 		}
 		
