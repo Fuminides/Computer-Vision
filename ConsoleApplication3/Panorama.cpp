@@ -1,3 +1,8 @@
+/*******************************
+ * Autor: Javier Fumanal Idocin
+ * Fecha: 2017-05-03
+ *
+ *******************************/
 #include "stdafx.h"
 #include <cstdio>
 #include <string>
@@ -15,6 +20,7 @@ using namespace std;
 #define USE_BRUTE 3
 #define USE_VECINO 4
 #define USE_FLANN 5
+#define USE_ALL 6
 
 #define TAM_MODELO 4
 
@@ -26,7 +32,7 @@ vector<KeyPoint> compute_keypoints(Mat imagen, int mode) {
 	Ptr<FeatureDetector> detector;
 	switch (mode) {
 	case USE_ORB:
-		detector = FastFeatureDetector::create(10);
+		detector = ORB::create();
 		break;
 	case USE_BRISK:
 		detector = BRISK::create();
@@ -35,7 +41,6 @@ vector<KeyPoint> compute_keypoints(Mat imagen, int mode) {
 
 	vector<KeyPoint> keypoints;
 	detector->detect(imagen, keypoints);
-
 	return keypoints;
 }
 
@@ -71,9 +76,10 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 	vector<DMatch> matches, good_matches;
 	vector<vector<DMatch>> matches_vecinos;
 	Ptr<BFMatcher> matcherBF;
+	Ptr<cv::DescriptorMatcher> matcher;
 	double distancia_minima = INFINITY;
 	int num_matches;
-
+	
 	switch(mode){
 	case USE_BRUTE:
 		matcherBF = BFMatcher::create(NORM_HAMMING,true);
@@ -111,14 +117,7 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 		matches = good_matches;
 		break;
 	case USE_FLANN:
-		/*if (descriptors1.type() != CV_32F) {
-			descriptors1.convertTo(descriptors1, CV_32F);
-		}
-		if (descriptors2.type() != CV_32F) {
-			descriptors2.convertTo(descriptors2, CV_32F);
-		}*/
-
-		Ptr<cv::DescriptorMatcher> matcher = makePtr<cv::FlannBasedMatcher>(makePtr<cv::flann::LshIndexParams>(12, 20, 2));
+		matcher = makePtr<cv::FlannBasedMatcher>(makePtr<cv::flann::LshIndexParams>(12, 20, 2));
 		
 		matcher->knnMatch(descriptors1, descriptors2, matches_vecinos,2);
 
@@ -126,6 +125,21 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 		for (int i = 0; i < num_matches; i++)
 		{
 			if (((matches_vecinos[i].size() > 0)) && (matches_vecinos[i][0].distance <= 0.5*matches_vecinos[i][1].distance) && (matches_vecinos[i][0].distance <= 35))
+			{
+				good_matches.push_back(matches_vecinos[i][0]);
+			}
+		}
+		matches = good_matches;
+		break;
+
+	case USE_ALL:
+		matcherBF = BFMatcher::create(NORM_HAMMING, true);
+		matcherBF->radiusMatch(descriptors1, descriptors2, matches_vecinos, 90);
+		
+		num_matches = matches_vecinos.size();
+		for (int i = 0; i < num_matches; i++)
+		{
+			if ((matches_vecinos[i][0].distance <= 0.5*matches_vecinos[i][1].distance))
 			{
 				good_matches.push_back(matches_vecinos[i][0]);
 			}
@@ -140,7 +154,7 @@ vector<DMatch> match_descriptors(Mat descriptors1, Mat descriptors2, int mode) {
 /**
  * Elimina los bordes negros de una imagen.
  */
-Mat cropBroders(Mat src) {
+Mat cropBorders(Mat src) {
 	Mat bt;
 	cvtColor(src, bt, COLOR_BGR2GRAY);
 	threshold(bt, bt, 1, 255, THRESH_BINARY);
@@ -189,17 +203,28 @@ Mat cropBroders(Mat src) {
 }
 
 /**
- * Genera el modelo de ransac siguiendo DTL
+ * Genera la homografia de los cuatro emparejamientos dados.
  */
 Mat generarModelo(int * usados, vector<Point2f> puntos1, vector<Point2f> puntos2) {
-
+	Mat homografia, mask;
+	vector<Point2f> puntos1_aux(TAM_MODELO), puntos2_aux(TAM_MODELO);
+	for (int i = 0; i < TAM_MODELO; i++) {
+		puntos1_aux[i] = puntos1[usados[i]];
+		puntos2_aux[i] = puntos2[usados[i]];
+	}
+	homografia = findHomography(puntos1_aux, puntos2_aux,mask,0);
+	return homografia;
 }
+
 /**
- * Calcula el ransac.
+ * Calcula la homografia utilizando ransac.
  */
-Mat hom_ransac(vector<Point2f> puntos2, vector<Point2f> puntos1, Mat mask, int limite = 50) {
+Mat hom_ransac(vector<Point2f> puntos2, vector<Point2f> puntos1, Mat & mask, int limite = 10) {
 	Mat homography;
-	int usados[TAM_MODELO], tam = puntos2.size(), numInlines, maxInlines = 0;
+	int usados[TAM_MODELO], tam = puntos1.size(), numInlines, maxInlines = 0;
+	int numero_acierto = TAM_MODELO, inliers_totales=0, outliers_totales=0;
+	
+	Mat mask_aux = Mat(Size(1, tam), CV_8U, Scalar(0));
 
 	for (int i = 0; i < limite; i++) {
 		for (int z = 0; z < TAM_MODELO; z++) {
@@ -207,114 +232,43 @@ Mat hom_ransac(vector<Point2f> puntos2, vector<Point2f> puntos1, Mat mask, int l
 		}
 		Mat modelo = generarModelo(usados, puntos2, puntos1);
 
-		for (int z = 0; z < puntos2.size(); z++) {
-			int x = 1;
+		std::vector<Point2f> convertidos(tam);
+		perspectiveTransform(puntos2, convertidos, modelo);
+
+		int numero_inliers = 0;
+
+		for (int z = 0; z < tam; z++) {
+			if ((abs(convertidos[z].x - puntos1[z].x) < 1) && (abs(convertidos[z].y - puntos1[z].y) < 1)){
+				numero_inliers++;
+				mask_aux.at<unsigned char>(z) = 1;
+			}
 		}
+
+		if (numero_inliers > numero_acierto) {
+			homography = modelo;
+			numero_acierto = numero_inliers;
+			double prob_fallar = numero_inliers*1.0 / tam;
+
+			limite = -5 / log10(prob_fallar) * 20;
+
+			i = 0;
+			for (int z = 0; z < tam; ++z) {
+				mask.at<unsigned char>(z) = mask_aux.at<unsigned char>(z);
+			}
+		}
+		
+		mask_aux.setTo(Scalar(0));
 	}
 
 	return homography;
 }
-/**
- * Junta la imagen de la homografia la imagen original, siempre y cuando la union entre ambas
- * sea en la parte derecha de la imagen original.
- */
-Mat juntarImagenes_derecha(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, int filtro = 1) {
-	Mat imagenFinal(nueva.rows, nueva.cols, DataType<unsigned char>::type);
-	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
-	int posicion = -1;
-	double alpha = 0.5;
 
-	for (int i = 1; i < imagenFinal.rows; ++i) {
-		for (int j = 1; j < imagenFinal.cols; ++j) {
-			if (filtro == 1) {
-				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
-					if (posicion < 0) {
-						double espacio = ultima_columna - j;
-						alpha = 1 / espacio;
-						posicion = j;
-					}
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j)*min(1,(alpha*abs(j - posicion))) + referencia_color.at<Vec3b>(i, j)*max(0,(1 - (alpha*abs(j - posicion))));
-					
-				}
-				else if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
-				}
-				else  {
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
-				}
-			}
-			else if (filtro == 0) {
-				if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
-				}
-				else {
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
-				}
-			}
-		}
-	}
-
-	cv::imshow("Panoramix", cropBroders(imagenFinal_color));
-
-	cv::waitKey(13);
-
-	return cropBroders(imagenFinal_color);
-}
 
 /**
 * Junta la imagen de la homografia la imagen original, siempre y cuando la union entre ambas
-* sea abajo de la imagen original.
+* sea en la parte izquierda/derecha de la imagen original.
 */
-Mat juntarImagenes_abajo(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_fila, int filtro = 0) {
-	double alpha = 0.5;
-	Mat imagenFinal(nueva.rows, nueva.cols, DataType<unsigned char>::type);
-	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
-	
-	int posicion = -1;
-
-	for (int i = 1; i < imagenFinal.rows; ++i) {
-		for (int j = 1; j < imagenFinal.cols; ++j) {
-			if (filtro == 1) {
-				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
-					if (posicion < 0) {
-						double espacio = abs(ultima_fila - i);
-						alpha = 1 / espacio;
-						posicion = i;
-					}
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j)*min(1, (alpha*abs(i - posicion))) + referencia_color.at<Vec3b>(i, j)*max(0, (1 - (alpha*abs(i - posicion))));
-
-				}
-				else if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
-				}
-				else {
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
-				}
-			}
-			else if (filtro == 0) {
-				if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
-				}
-				else {
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
-				}
-			}
-		}
-	}
-
-	imagenFinal_color = cropBroders(imagenFinal_color);
-	cv::imshow("Panoramix", imagenFinal_color);
-
-	cv::waitKey(13);
-
-	return imagenFinal_color;
-}
-
-/**
- * Junta la imagen de la homografia la imagen original, siempre y cuando la union entre ambas
- * sea en la parte izquierda de la imagen original.
- */
-Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, int filtro = 1) {
+Mat juntarImagenes_horizontal(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_columna, bool izquierda, int filtro = 1) {
 	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
 	Mat imagenFinal(nueva.rows, nueva.cols, CV_8U);
 
@@ -324,14 +278,14 @@ Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referenc
 		for (int j = 1; j < imagenFinal_color.cols; ++j) {
 			if (filtro == 1) {
 				//Miramos si estamos en zona de interseccion
-				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i , j) != 0) && (referencia.at<unsigned char>(i , j)!=0)) {
+				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
 					if (posicion == -1) {
 						espacio = abs(ultima_columna - j);
 						alpha = 1 / espacio;
 						posicion = j;
-						cout << "Alpha: " << alpha << " Ultima Columna " << ultima_columna << " Posicion " << posicion << "Correcto: "<< abs(ultima_columna-posicion) * alpha<< endl;
 					}
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i , j) *min(1,(alpha*abs(j - posicion))) + nueva_color.at<Vec3b>(i, j)*max(0,(1 - (alpha*abs(j - posicion))));
+					if (izquierda) imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j) *min(1, (alpha*abs(j - posicion))) + nueva_color.at<Vec3b>(i, j)*max(0, (1 - (alpha*abs(j - posicion))));
+					else imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j) *min(1, (alpha*abs(j - posicion))) + referencia_color.at<Vec3b>(i, j)*max(0, (1 - (alpha*abs(j - posicion))));
 				}
 				//Si no cogemos de la referencia
 				else if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
@@ -357,66 +311,18 @@ Mat juntarImagenes_izquierda(Mat referencia_color, Mat nueva_color, Mat referenc
 			}
 		}
 	}
-	
-	cv::imshow("Panoramix", cropBroders(imagenFinal_color));
+
+	cv::imshow("Panoramix", cropBorders(imagenFinal_color));
 
 	cv::waitKey(13);
 
-	return cropBroders(imagenFinal_color);
+	return cropBorders(imagenFinal_color);
 }
+
 
 /**
 * Junta la imagen de la homografia la imagen original, siempre y cuando la union entre ambas
-* sea en la parte arriba de la imagen original.
-*/
-Mat juntarImagenes_arriba(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_fila, int filtro = 1) {
-	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
-	Mat imagenFinal(nueva.rows, nueva.cols, CV_8U);
-
-	int posicion = -1;
-	double espacio, alpha = 0.5;
-	for (int i = 1; i < imagenFinal.rows; ++i) {
-		for (int j = 1; j < imagenFinal.cols - 1; ++j) {
-			if (filtro == 1) {
-				//Miramos si estamos en zona de interseccion
-				if ((i < referencia.rows) && (j < referencia.cols) && (nueva.at<unsigned char>(i, j) != 0) && (referencia.at<unsigned char>(i, j) != 0)) {
-					if (posicion == -1) {
-						espacio = abs(ultima_fila - i);
-						alpha = 1 / espacio;
-						posicion = i;
-					}
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j) *min(1, (alpha*abs(i - posicion))) + referencia_color.at<Vec3b>(i, j)*max(0, (1 - (alpha*abs(i - posicion))));
-				}
-				//Si no cogemos de la referencia
-				else if ((i < referencia.rows) && (j < referencia.cols) && (referencia.at<unsigned char>(i, j) != 0)) {
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
-				}
-				//Si no, estamos en el sitio a anyadir (comprobamos rangos de matriz)
-				else if ((nueva.at<unsigned char>(i, j) != 0)) {
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
-				}
-			}
-			if (filtro == 0) {
-				if ((i < referencia.rows) && (j < referencia.cols)){
-					imagenFinal_color.at<Vec3b>(i, j) = referencia_color.at<Vec3b>(i, j);
-				}
-				else  {
-					imagenFinal_color.at<Vec3b>(i, j) = nueva_color.at<Vec3b>(i, j);
-				}
-			}
-		}
-	}
-
-	cv::imshow("Panoramix", cropBroders(imagenFinal_color));
-
-	cv::waitKey(13);
-
-	return cropBroders(imagenFinal_color);
-}
-
-/**
-* Junta la imagen de la homografia la imagen original, siempre y cuando la union entre ambas
-* sea en la parte arriba de la imagen original.
+* sea en la parte arriba/abajo de la imagen original.
 */
 Mat juntarImagenes_vertical(Mat referencia_color, Mat nueva_color, Mat referencia, Mat nueva, int ultima_fila, bool arriba, int filtro = 1) {
 	Mat imagenFinal_color(nueva.rows, nueva.cols, CV_8UC3);
@@ -457,17 +363,18 @@ Mat juntarImagenes_vertical(Mat referencia_color, Mat nueva_color, Mat referenci
 		}
 	}
 
-	cv::imshow("Panoramix", cropBroders(imagenFinal_color));
+	cv::imshow("Panoramix", cropBorders(imagenFinal_color));
 
 	cv::waitKey(13);
 
-	return cropBroders(imagenFinal_color);
+	return cropBorders(imagenFinal_color);
 }
+
 /**
  * Dadas dos imagenes en blanco y negro y en color, crea un panorama con ambas si encuentra los suficientes
  * puntos de interes.
  */
-Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color, bool full = true, int min_match = 10, int modo =  USE_BRISK, int filtro = 1) {
+Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color, int modo = USE_BRISK, bool full = false, int min_match = 10, int filtro = 1, bool hom_propia=false) {
 	vector<KeyPoint> k1, k2;
 	vector<Point2f> puntos1, puntos2;
 	vector<DMatch> matches, inliers;
@@ -486,7 +393,13 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 			puntos2.push_back(k2[matches[i].trainIdx].pt);
 		}
 
-		homografia = findHomography(puntos2, puntos1, mask, CV_RANSAC);
+		if (!hom_propia) {
+			homografia = findHomography(puntos2, puntos1, mask, CV_RANSAC);
+		}
+		else {
+			mask = Mat(Size(1, puntos1.size()), CV_8U, Scalar(0));
+			homografia = hom_ransac(puntos2, puntos1, mask);
+		}
 		for (int i = 0; i < num_matches; i++) {
 			if (mask.at<unsigned char>(i)) {
 				inliers.push_back(matches[i]);
@@ -527,11 +440,11 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 
 		if ((v_sumas[0] == 0) && (ultima_columna > (tam -1)/2) && (r_sumas[10] != 0) && (r_sumas[r_sumas.size() - 10] != 0)) {
 			cout << "Empalmamos por la derecha." << endl;
-			return juntarImagenes_derecha(imagen1_color, composicion_color, imagen1, composicion, ultima_columna, filtro);
+			return juntarImagenes_horizontal(imagen1_color, composicion_color, imagen1, composicion, ultima_columna, false, filtro);
 		}
 		else {
 			//Reajustamos a un marco mas grande (tam actual + tam actual*coef_aum)
-			float coef_aum = 2;
+			float coef_aum = 2.5;
 			int aumentoC1 = imagen1.cols * coef_aum, aumentoR1 = imagen1.rows * coef_aum;
 			int aumentoC2 = imagen2.cols * coef_aum, aumentoR2 = imagen2.rows * coef_aum;
 
@@ -567,7 +480,7 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 
 			if (full) {
 				drawMatches(n_m1, k1, n_m2, k2, inliers, inliers_figure);
-				imshow("inliers_new", cropBroders(inliers_figure));
+				imshow("inliers_new", cropBorders(inliers_figure));
 			}
 
 			puntos1.clear();
@@ -579,7 +492,17 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 				puntos2.push_back(k2[matches[i].trainIdx].pt);
 			}
 
-			homografia = findHomography(puntos2, puntos1, mask, CV_RANSAC);
+			if (!hom_propia) {
+				homografia = findHomography(puntos2, puntos1, mask, CV_RANSAC);
+			}
+			else {
+				mask = Mat(Size(1, puntos1.size()), CV_8U, Scalar(0));
+				homografia = hom_ransac(puntos2, puntos1, mask);
+				if (sum(mask).val == 0) {
+					cout << "Homografia basura!" << endl;
+					return imagen1_color;
+				}
+			}
 
 			warpPerspective(n_m2, composicion, homografia, Size(n_m2.cols, n_m2.rows));
 			warpPerspective(n_m2_color, composicion_color, homografia, Size(n_m2.cols, n_m2.rows));
@@ -599,7 +522,7 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 					}
 				}
 				cout << "Empalmamos por la izquierda." << endl;
-				return juntarImagenes_izquierda(n_m1_color, composicion_color, n_m1, composicion, ultima_columna, filtro);
+				return juntarImagenes_horizontal(n_m1_color, composicion_color, n_m1, composicion, ultima_columna, true, filtro);
 			}
 			else if ((r_sumas[0] != 0) && (r_sumas[r_sumas.size() - 5] == 0)) {
 				transpose(composicion, traspose);
@@ -611,7 +534,7 @@ Mat match_images(Mat imagen1, Mat imagen1_color, Mat imagen2, Mat imagen2_color,
 						break;
 					}
 				}
-				cout << "Empalmamos por arriba. " << ultima_fila << endl;
+				cout << "Empalmamos por arriba. " << endl;
 				return juntarImagenes_vertical(n_m1_color, composicion_color, n_m1, composicion, ultima_fila, true, filtro);
 			}
 			else {
@@ -684,7 +607,7 @@ void matching_camera_boton(int numero_imagenes = 2) {
  * Captura imagenes con la camara y construye automaticamente un panorama con ellas si es posible.
  * Se puede especificar un tiempo de ciclo para escoger cada cuanto se capturan las imagenes.
  */
-void matching_camera_automatico(int ciclo = 1000) {
+void matching_camera_automatico(int ciclo = 0) {
 	VideoCapture cap;
 	Mat imagen1_color, imagen1, imagen2_color, imagen2;
 	int tomadas = 0;
@@ -693,7 +616,7 @@ void matching_camera_automatico(int ciclo = 1000) {
 
 	if (!cap.open(0))
 		return;
-	waitKey();
+	
 	while (true) {
 		if (tomadas == 0) {
 			cap >> imagen1_color;
@@ -710,14 +633,12 @@ void matching_camera_automatico(int ciclo = 1000) {
 		}
 		else {
 			cvtColor(imagen2_color, imagen2, CV_BGR2GRAY);
-			imagen1_color = match_images(imagen2, imagen2_color, imagen1, imagen1_color);
+			imagen1_color = match_images(imagen2, imagen2_color, imagen1, imagen1_color,USE_ORB);
 			cvtColor(imagen1_color, imagen1, CV_BGR2GRAY);
 			cv::imshow("Panoramix", imagen1_color);
 		}
 		tomadas++;
 		Sleep(ciclo);
-
-		cout << "pasa ciclo" << endl;
 	}
 
 }
@@ -731,6 +652,7 @@ void matching_disco(char ** argv, bool full = false) {
 
 	match_images(imagen1, imagen1_color, imagen2, imagen2_color);
 }
+
 /**
  * Calcula un panorama de imagenes tomadas segun el parametro dado:
  * -d Las carga de disco (se requieren las dos rutas de las imagenes)
@@ -745,7 +667,7 @@ void main(int argc, char ** argv) {
 		matching_camera_boton(10);
 	}
 	else if (strcmp(argv[1], "-v") == 0) {
-		matching_camera_automatico();
+		matching_camera_automatico(0);
 	}
 	
 
